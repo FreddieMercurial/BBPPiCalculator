@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BBP", "BBP\BBP.csproj", "{F
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BBP.Test", "BBP.Test\BBP.Test.csproj", "{093B3281-36E4-4D32-82D8-404EB1447283}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BBP.FasterKVMiner", "BBP.FasterKVMiner\BBP.FasterKVMiner.csproj", "{9AE07C89-4A1D-40DD-A003-BD4802F6DF41}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{093B3281-36E4-4D32-82D8-404EB1447283}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{093B3281-36E4-4D32-82D8-404EB1447283}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{093B3281-36E4-4D32-82D8-404EB1447283}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9AE07C89-4A1D-40DD-A003-BD4802F6DF41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9AE07C89-4A1D-40DD-A003-BD4802F6DF41}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9AE07C89-4A1D-40DD-A003-BD4802F6DF41}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9AE07C89-4A1D-40DD-A003-BD4802F6DF41}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
