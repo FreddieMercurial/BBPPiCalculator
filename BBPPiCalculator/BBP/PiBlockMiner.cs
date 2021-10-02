@@ -1,4 +1,4 @@
-﻿namespace BBP.FasterKVMiner
+﻿namespace BBP
 {
     public static class PiBlockMiner
     {

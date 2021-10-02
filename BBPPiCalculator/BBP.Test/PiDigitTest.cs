@@ -71,6 +71,7 @@
                     count: count)
                 .Select(c => (char)c)
                 .ToArray());
+            Assert.AreEqual(expected: count, result.Length);
             Assert.AreEqual(expected: expected, actual: result);
         }
 
@@ -91,6 +92,7 @@
             }
 
             var result = new string(accumulator.ToArray());
+            Assert.AreEqual(expected: count, result.Length);
             Assert.AreEqual(expected: expected, actual: result);
         }
 
