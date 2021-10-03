@@ -22,10 +22,15 @@
 
         public async Task<WorkBlock> StartWork(long startingOffset)
         {
-            PiDigit pd = new PiDigit(startingOffset);
             var workBlock = new WorkBlock(
                 startingOffset: startingOffset,
                 blockSizes: this.BlockSizes);
+
+            await workBlock
+                .AsWorkable()
+                .Work()
+                .ConfigureAwait(false);
+
             return workBlock;
         }
 
