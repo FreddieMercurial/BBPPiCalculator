@@ -4,6 +4,10 @@
     {
         private FasterKVBBPiMiner fasterKV;
 
+        private const int BufferMaxCapacity = 4194304 * 50;
+        private long piBytesOffset = 0;
+        private readonly PiByteBuffer piBytes;
+
         private readonly int[] BlockSizes = new int[]
         {
             128,
@@ -18,6 +22,9 @@
         public Tracker()
         {
             this.fasterKV = new FasterKVBBPiMiner();
+            this.piBytes = new PiByteBuffer(
+                startingOffset: piBytesOffset,
+                maxCapacity: BufferMaxCapacity);
         }
 
         public async Task<WorkBlock> StartWork(long startingOffset)
@@ -30,7 +37,7 @@
             {
                 return workBlock
                     .AsWorkable()
-                    .Work();
+                    .Work(workingMemory: this.piBytes);
             }).ConfigureAwait(false);
         }
 
