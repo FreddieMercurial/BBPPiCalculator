@@ -22,7 +22,7 @@ namespace BBP.FasterKVMiner
         WorkBlock IWorkable.Work()
         {
             // from the given digit index, compute all sha 256 hashes of all block sizes beginning at that index
-            // get the longest block size and then get that may pi bytes from here
+            // get the longest block size and then get that many pi bytes from here
             var maxBlockSize = this.BlockSizes.Max();
             var piBytes = this.piGenerator.PiBytes(
                 n: this.StartingOffset,
