@@ -4,9 +4,11 @@
     {
         private FasterKVBBPiMiner fasterKV;
 
-        private const int BufferMaxCapacity = 4194304 * 50;
+        private const int MaxThreadCount = 10;
+        private const int BufferMaxCapacity = 4194304 * MaxThreadCount * 5;
         private long piBytesOffset = 0;
         private readonly PiByteBuffer piBytes;
+        private readonly Thread[] Threads;
 
         private readonly int[] BlockSizes = new int[]
         {
@@ -27,7 +29,7 @@
                 maxCapacity: BufferMaxCapacity);
         }
 
-        public async Task<WorkBlock> StartWork(long startingOffset)
+        private async Task<WorkBlock> StartWork(long startingOffset)
         {
             var workBlock = new WorkBlock(
                 startingOffset: startingOffset,

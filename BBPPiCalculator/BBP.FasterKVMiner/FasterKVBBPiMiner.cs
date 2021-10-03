@@ -49,9 +49,9 @@
                             comparer: null);
         }
 
-        public static string NSizeKey(int n, int blockSize) => string.Format("n{0}:b{1}", n, blockSize);
-        public static string NSizeValue(char firstDigit, string sha256) => string.Format("{0}:{1}", firstDigit, sha256);
-        public static (char, string) NSizeValue(string storedValue)
+        private static string NSizeKey(int n, int blockSize) => string.Format("n{0}:b{1}", n, blockSize);
+        private static string NSizeValue(char firstDigit, string sha256) => string.Format("{0}:{1}", firstDigit, sha256);
+        private static (char, string) NSizeValue(string storedValue)
         {
             var parts = storedValue.Split(
                 separator: new char[] { ':' },
@@ -59,8 +59,8 @@
             return (parts[0][0], parts[1]);
         }
 
-        public static string SizeSHAKey(int blockSize, string sha256) => string.Format("b{0}:s{1}", blockSize, sha256);
-        public static string SizeSHAValue(int nOffset, string oldValue = null)
+        private static string SizeSHAKey(int blockSize, string sha256) => string.Format("b{0}:s{1}", blockSize, sha256);
+        private static string SizeSHAValue(int nOffset, string oldValue = null)
         {
             var nOffsetString = Convert.ToString(nOffset);
             return oldValue is null ? nOffsetString : string.Join(
@@ -68,14 +68,14 @@
                 oldValue,
                 nOffsetString);
         }
-        public static IEnumerable<int> SizeSHAValue(string storedValue) =>
+        private static IEnumerable<int> SizeSHAValue(string storedValue) =>
             storedValue
                 .Split(',')
                 .Select(value => Convert.ToInt32(value));
 
-        public static string NextSizeKey(int blockSize) => string.Format("nextBlock:{0}", blockSize);
-        public static string NextSizeValue(int n) => string.Format("{0}", n);
-        public static int NextSizeValue(string storedValue) => Convert.ToInt32(storedValue);
+        private static string NextSizeKey(int blockSize) => string.Format("nextBlock:{0}", blockSize);
+        private static string NextSizeValue(int n) => string.Format("{0}", n);
+        private static int NextSizeValue(string storedValue) => Convert.ToInt32(storedValue);
 
         public int AddComputation(int n, int blockSize, char firstDigit, string sha256)
         {
@@ -143,7 +143,7 @@
             return new DirectoryInfo(dir);
         }
 
-        protected DirectoryInfo GetDiskCacheDirectory()
+        private DirectoryInfo GetDiskCacheDirectory()
         {
             return Directory.CreateDirectory(
                 Path.Combine(
@@ -151,7 +151,7 @@
                     path2: "PiMiner"));
         }
 
-        protected string GetDevicePath(string nameSpace, out DirectoryInfo cacheDirectoryInfo)
+        private string GetDevicePath(string nameSpace, out DirectoryInfo cacheDirectoryInfo)
         {
             cacheDirectoryInfo = this.GetDiskCacheDirectory();
 
@@ -163,7 +163,7 @@
                     nameSpace));
         }
 
-        protected IDevice CreateLogDevice(string nameSpace)
+        private IDevice CreateLogDevice(string nameSpace)
         {
             var devicePath = this.GetDevicePath(nameSpace, out DirectoryInfo _);
 
