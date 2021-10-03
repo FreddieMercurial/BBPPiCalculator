@@ -2,7 +2,7 @@
 {
     public interface IWorkable
     {
-        async Task<WorkBlock> Work()
+        WorkBlock Work()
         {
             throw new NotImplementedException();
         }

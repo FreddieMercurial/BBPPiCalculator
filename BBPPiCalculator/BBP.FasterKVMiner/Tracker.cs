@@ -26,12 +26,12 @@
                 startingOffset: startingOffset,
                 blockSizes: this.BlockSizes);
 
-            await workBlock
-                .AsWorkable()
-                .Work()
-                .ConfigureAwait(false);
-
-            return workBlock;
+            return await Task<WorkBlock>.Run(() =>
+            {
+                return workBlock
+                    .AsWorkable()
+                    .Work();
+            }).ConfigureAwait(false);
         }
 
         public void Dispose()
