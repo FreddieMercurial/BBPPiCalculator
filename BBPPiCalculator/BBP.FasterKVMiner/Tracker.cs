@@ -4,15 +4,15 @@
     {
         private FasterKVBBPiMiner fasterKV;
 
-        /// <summary>
-        /// Example
-        /// </summary>
         private readonly int[] BlockSizes = new int[]
         {
-            10,
-            100,
-            1000,
-            10000
+            128,
+            256,
+            512,
+            1024,
+            4096,
+            1048576,
+            4194304,
         };
 
         public Tracker()
