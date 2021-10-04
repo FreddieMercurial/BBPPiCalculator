@@ -73,11 +73,6 @@ namespace BBP.FasterKVMiner.Test
         }
 
         [TestMethod]
-        public void TestPiBuffer()
-        {
-        }
-
-        [TestMethod]
         public void Dispose_StateUnderTest_ExpectedBehavior()
         {
             // Arrange
