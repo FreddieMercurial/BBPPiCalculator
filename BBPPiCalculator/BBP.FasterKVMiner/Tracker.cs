@@ -46,7 +46,7 @@
         private async Task<WorkBlock> PerformComputation(long startingOffset)
         {
             var resultWorkBlock = await this.StartWork(startingOffset: startingOffset).ConfigureAwait(false);
-            foreach(var blockSize in resultWorkBlock.BlockSizes)
+            foreach (var blockSize in resultWorkBlock.BlockSizes)
             {
                 this.fasterKV.AddComputation(
                     n: resultWorkBlock.StartingOffset,
