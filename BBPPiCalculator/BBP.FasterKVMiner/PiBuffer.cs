@@ -1,6 +1,6 @@
 ﻿namespace BBP.FasterKVMiner
 {
-    public class PiByteBuffer : IDisposable
+    public class PiBuffer : IDisposable
     {
         private PiDigit piGenerator;
         private long LowestOffsetContained;
@@ -9,8 +9,13 @@
         private readonly int MaximumCapacity;
         private Mutex mutex;
 
-        public PiByteBuffer(long startingOffset, int maxCapacity)
+        public PiBuffer(long startingOffset, int maxCapacity)
         {
+            if (startingOffset < 0)
+            {
+                throw new ArgumentException(nameof(startingOffset));
+            }
+
             this.MaximumCapacity = maxCapacity;
             this.piGenerator = new PiDigit(nOffset: startingOffset);
             this.LowestOffsetContained = 1;
@@ -24,7 +29,11 @@
 
         private void Ensure(long minimum, long maximum, bool useMutex = true)
         {
-            if (maximum < minimum)
+            if ((minimum < 0) || (minimum > maximum))
+            {
+                throw new ArgumentException(nameof(minimum));
+            }
+            else if ((maximum < 0) || (maximum < minimum))
             {
                 throw new ArgumentException(nameof(maximum));
             }

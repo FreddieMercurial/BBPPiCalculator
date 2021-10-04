@@ -2,7 +2,7 @@
 {
     public interface IWorkable
     {
-        WorkBlock Work(PiByteBuffer workingMemory)
+        WorkBlock Work(PiBuffer workingMemory)
         {
             throw new NotImplementedException();
         }

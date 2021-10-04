@@ -106,7 +106,6 @@
 
         public void AddComputation(long n, int blockSize, char firstChar, string sha256)
         {
-            var nextSizeKey = NextSizeKey(blockSize: blockSize);
             var sizeSHAKey = SizeSHAKey(
                     blockSize: blockSize,
                     sha256: sha256);

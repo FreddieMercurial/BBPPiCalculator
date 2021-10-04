@@ -7,7 +7,7 @@
         private const int MaxThreadCount = 10;
         private const int BufferMaxCapacity = 4194304 * MaxThreadCount * 5;
         private long piBytesOffset = 0;
-        private readonly PiByteBuffer piBytes;
+        private readonly PiBuffer piBytes;
         private readonly Thread[] Threads;
 
         private readonly int[] BlockSizes = new int[]
@@ -24,7 +24,7 @@
         public Tracker()
         {
             this.fasterKV = new FasterKVBBPiMiner();
-            this.piBytes = new PiByteBuffer(
+            this.piBytes = new PiBuffer(
                 startingOffset: piBytesOffset,
                 maxCapacity: BufferMaxCapacity);
         }

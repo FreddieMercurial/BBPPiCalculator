@@ -22,7 +22,7 @@ namespace BBP.FasterKVMiner
             this.BlockSizeHashBuffer = new Dictionary<int, byte[]>();
         }
 
-        WorkBlock IWorkable.Work(PiByteBuffer workingMemory)
+        WorkBlock IWorkable.Work(PiBuffer workingMemory)
         {
             // from the given digit index, compute all sha 256 hashes of all block sizes beginning at that index
             // get the longest block size and then get that many pi bytes from here
