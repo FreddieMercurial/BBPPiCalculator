@@ -77,7 +77,34 @@
         private static string NextSizeValue(long n) => string.Format("{0}", n);
         private static long NextSizeValue(string storedValue) => Convert.ToInt64(storedValue);
 
-        public long AddComputation(long n, int blockSize, char firstChar, string sha256)
+        private long GetNextN(int blockSize, ClientSession<string, string, string, string, object, IFunctions<string, string, string, string, object>>? session = null)
+        {
+            if (session is null)
+            {
+                fasterPiStore.NewSession(
+                    functions: new SimpleFunctions<string, string>());
+            }
+
+            var nextSizeTuple = session.Read(
+                key: NextSizeKey(
+                    blockSize: blockSize));
+            return nextSizeTuple.status == Status.OK ? NextSizeValue(nextSizeTuple.output) : 0;
+        }
+
+        private void SetNextN(int blockSize, long nextN, ClientSession<string, string, string, string, object, IFunctions<string, string, string, string, object>>? session = null)
+        {
+            if (session is null)
+            {
+                fasterPiStore.NewSession(
+                    functions: new SimpleFunctions<string, string>());
+            }
+
+            session.Upsert(
+                key: NextSizeKey(blockSize: blockSize),
+                desiredValue: NextSizeValue(n: nextN));
+        }
+
+        public void AddComputation(long n, int blockSize, char firstChar, string sha256)
         {
             var nextSizeKey = NextSizeKey(blockSize: blockSize);
             var sizeSHAKey = SizeSHAKey(
@@ -85,16 +112,12 @@
                     sha256: sha256);
 
             var session = fasterPiStore.NewSession(
-                functions: new AdvancedSimpleFunctions<string, string>());
+                functions: new SimpleFunctions<string, string, object>());
 
             // read
             var sizeSHAOldValueTuple = session.Read(
                 key: sizeSHAKey);
             string sizeSHAOldValue = (sizeSHAOldValueTuple.status == Status.OK) ? sizeSHAOldValueTuple.output : null;
-
-            var nextSizeTuple = session.Read(
-                key: nextSizeKey);
-            long nextN = nextSizeTuple.status == Status.OK ? NextSizeValue(nextSizeTuple.output) : n + 1;
 
             // update
             session.Upsert(
@@ -107,12 +130,8 @@
             session.Upsert(
                 key: sizeSHAKey,
                 desiredValue: SizeSHAValue(nOffset: n));
-            session.Upsert(
-                key: nextSizeKey,
-                desiredValue: NextSizeValue(n: nextN));
             session.CompletePending(
                 wait: false);
-            return nextN;
         }
 
         private static LogSettings NewLogSettings(IDevice logDevice, IDevice objectDevice, bool useReadCache)
