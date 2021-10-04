@@ -31,6 +31,7 @@ namespace BBP.FasterKVMiner.Test
             Assert.IsTrue(piBytesTestAppend.SequenceEqual(new byte[] { 0x24, 0x3F, 0x6A, 0x88, 0x85, 0xA3, 0x08, 0xD3, 0x13, 0x19, 0x8A, 0x2E, 0x03, 0x70, 0x73 }));
 
             // TODO: it's possible we might be able to screw things up by moving to an odd minimum- idiot proof?
+            // starting at 10 - 20 and moving to 11 to 21 or something, or 11 - 21 and moving to 10-22
             var piBytesTestAppendTwice = piBuffer.GetPiSegment(
                 minimum: 0,
                 maximum: 40);
