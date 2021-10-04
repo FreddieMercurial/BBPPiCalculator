@@ -11,7 +11,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BBP.Test", "BBP.Test\BBP.Te
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BBP.FasterKVMiner", "BBP.FasterKVMiner\BBP.FasterKVMiner.csproj", "{9AE07C89-4A1D-40DD-A003-BD4802F6DF41}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BBP.FasterKVMiner.Test", "BBP.FasterKVMiner.Test\BBP.FasterKVMiner.Test.csproj", "{C2A0F915-06F8-4F68-9793-AC8C7E3B84EC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BBP.FasterKVMiner.Test", "BBP.FasterKVMiner.Test\BBP.FasterKVMiner.Test.csproj", "{C2A0F915-06F8-4F68-9793-AC8C7E3B84EC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9521386F-9574-465C-90CE-783737596906}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
