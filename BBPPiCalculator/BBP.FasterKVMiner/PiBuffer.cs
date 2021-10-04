@@ -8,7 +8,7 @@
         private byte[] WorkingMemory;
         private readonly int MaximumByteCapacity;
         private Mutex mutex;
-        private const int NativeChunkSize = 10;
+        private const int NativeChunkSizeInChars = 10;
 
         public PiBuffer(long startingCharOffset, int maxByteCapacity)
         {
@@ -16,7 +16,7 @@
             {
                 throw new ArgumentException(nameof(startingCharOffset));
             }
-            else if (maxByteCapacity < NativeChunkSize)
+            else if (maxByteCapacity < NativeChunkSizeInChars)
             {
                 throw new ArgumentException(nameof(maxByteCapacity));
             }
@@ -24,7 +24,7 @@
             this.MaximumByteCapacity = maxByteCapacity;
             this.piGenerator = new PiDigit(nOffset: startingCharOffset);
             this.LowestCharOffsetContained = startingCharOffset;
-            this.HighestCharOffsetContained = startingCharOffset + NativeChunkSize;
+            this.HighestCharOffsetContained = startingCharOffset + NativeChunkSizeInChars;
             var memorySize = (int)(HighestCharOffsetContained - LowestCharOffsetContained);
             this.WorkingMemory = piGenerator.PiBytes(
                 n: LowestCharOffsetContained,
