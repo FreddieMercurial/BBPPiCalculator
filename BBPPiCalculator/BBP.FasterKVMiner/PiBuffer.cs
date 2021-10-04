@@ -3,28 +3,47 @@
     public class PiBuffer : IDisposable
     {
         private PiDigit piGenerator;
-        private long LowestOffsetContained;
-        private long HighestOffsetContained;
+        private long LowestCharOffsetContained;
+        private long HighestCharOffsetContained;
         private byte[] WorkingMemory;
-        private readonly int MaximumCapacity;
+        private readonly int MaximumByteCapacity;
         private Mutex mutex;
+        private const int NativeChunkSize = 10;
 
-        public PiBuffer(long startingOffset, int maxCapacity)
+        public PiBuffer(long startingCharOffset, int maxByteCapacity)
         {
-            if (startingOffset < 0)
+            if (startingCharOffset < 0)
             {
-                throw new ArgumentException(nameof(startingOffset));
+                throw new ArgumentException(nameof(startingCharOffset));
+            }
+            else if (maxByteCapacity < NativeChunkSize)
+            {
+                throw new ArgumentException(nameof(maxByteCapacity));
             }
 
-            this.MaximumCapacity = maxCapacity;
-            this.piGenerator = new PiDigit(nOffset: startingOffset);
-            this.LowestOffsetContained = 1;
-            this.HighestOffsetContained = 10;
-            var memorySize = (int)(HighestOffsetContained - LowestOffsetContained);
+            this.MaximumByteCapacity = maxByteCapacity;
+            this.piGenerator = new PiDigit(nOffset: startingCharOffset);
+            this.LowestCharOffsetContained = startingCharOffset;
+            this.HighestCharOffsetContained = startingCharOffset + NativeChunkSize;
+            var memorySize = (int)(HighestCharOffsetContained - LowestCharOffsetContained);
             this.WorkingMemory = piGenerator.PiBytes(
-                n: LowestOffsetContained,
+                n: LowestCharOffsetContained,
                 count: memorySize).ToArray();
             this.mutex = new Mutex(false);
+        }
+
+        private (long, long) CurrentRangeUnsafe
+            => (this.LowestCharOffsetContained, this.HighestCharOffsetContained);
+
+        public (long, long) CurrentRange
+        {
+            get
+            {
+                this.mutex.WaitOne();
+                var range = this.CurrentRangeUnsafe;
+                this.mutex.ReleaseMutex();
+                return range;
+            }
         }
 
         private void Ensure(long minimum, long maximum, bool useMutex = true)
@@ -37,11 +56,15 @@
             {
                 throw new ArgumentException(nameof(maximum));
             }
+            else if ((maximum - minimum) % 2 != 0)
+            {
+                throw new ArgumentException("spread must be multiple of 2 characters");
+            }
             else if (
-                (minimum >= LowestOffsetContained) &&
-                (minimum <= HighestOffsetContained) &&
-                (maximum >= LowestOffsetContained) &&
-                (maximum <= HighestOffsetContained)
+                (minimum >= LowestCharOffsetContained) &&
+                (minimum <= HighestCharOffsetContained) &&
+                (maximum >= LowestCharOffsetContained) &&
+                (maximum <= HighestCharOffsetContained)
             )
             {
                 return;
@@ -58,15 +81,16 @@
                     requestedMinimum: minimum,
                     requestedMaximum: maximum);
 
-                if (minimum < LowestOffsetContained)
+                if (minimum < LowestCharOffsetContained)
                 {
 
                     // add bytes on the left
-                    var bytesNeeded = (int)(LowestOffsetContained - minimum);
+                    var charsNeeded = (int)(LowestCharOffsetContained - minimum);
+                    var bytesNeeded = (int)(charsNeeded / 2);
                     var leftMemory = this.piGenerator.PiBytes(
                         n: minimum,
                         count: bytesNeeded).ToArray();
-                    Array.Resize(ref leftMemory, bytesNeeded + WorkingMemory.Length);
+                    Array.Resize(ref leftMemory, WorkingMemory.Length + bytesNeeded);
                     Array.Copy(
                         sourceArray: WorkingMemory,
                         sourceIndex: 0,
@@ -74,14 +98,15 @@
                         destinationIndex: bytesNeeded,
                         length: WorkingMemory.Length);
                     this.WorkingMemory = leftMemory;
-                    this.LowestOffsetContained = minimum;
+                    this.LowestCharOffsetContained = minimum;
                 }
 
-                if (maximum > HighestOffsetContained)
+                if (maximum > HighestCharOffsetContained)
                 {
-                    var bytesNeeded = (int)(maximum - HighestOffsetContained);
+                    var charsNeeded = (int)(maximum - HighestCharOffsetContained);
+                    var bytesNeeded = (int)(charsNeeded / 2);
                     var rightMemory = this.piGenerator.PiBytes(
-                        n: this.HighestOffsetContained + 1,
+                        n: this.HighestCharOffsetContained + 1,
                         count: bytesNeeded).ToArray();
                     var oldLength = WorkingMemory.Length;
                     Array.Resize(ref WorkingMemory, oldLength + bytesNeeded);
@@ -91,7 +116,7 @@
                         destinationArray: WorkingMemory,
                         destinationIndex: oldLength,
                         length: bytesNeeded);
-                    this.HighestOffsetContained = maximum;
+                    this.HighestCharOffsetContained = maximum;
                 }
             }
             finally
@@ -105,33 +130,43 @@
 
         public byte[] GetPiSegment(long minimum, long maximum)
         {
-            var returnArray = new byte[maximum - minimum];
+            if ((maximum - minimum) % 2 != 0)
+            {
+                throw new ArgumentException("spread must be multiple of 2 characters");
+            }
             try
             {
                 this.mutex.WaitOne();
+
+                var charsNeeded = maximum - minimum;
+                var bytesNeeded = (int)(charsNeeded / 2);
+                var returnArray = new byte[bytesNeeded];
 
                 this.Ensure(
                     minimum: minimum,
                     maximum: maximum,
                     useMutex: false);
+
+                var distanceFromZero = (LowestCharOffsetContained - minimum) / 2;
                 Array.Copy(
                     sourceArray: WorkingMemory,
-                    sourceIndex: minimum - LowestOffsetContained,
+                    sourceIndex: distanceFromZero,
                     destinationArray: returnArray,
                     destinationIndex: 0,
                     length: returnArray.Length);
+
+                return returnArray;
             }
             finally
             {
                 this.mutex.ReleaseMutex();
             }
-            return returnArray;
         }
 
         private void GarbageCollect(long requestedMinimum, long requestedMaximum)
         {
-            var sizeRequested = requestedMaximum - requestedMinimum;
-            if (sizeRequested > MaximumCapacity)
+            var charsRequested = requestedMaximum - requestedMinimum;
+            if ((charsRequested / 2) > MaximumByteCapacity)
             {
                 this.PruneLeft(newMinimum: requestedMaximum);
             }
@@ -139,18 +174,20 @@
 
         private void PruneLeft(long newMinimum)
         {
-            if ((newMinimum < LowestOffsetContained) || (newMinimum > HighestOffsetContained))
+            if ((newMinimum < LowestCharOffsetContained) || (newMinimum > HighestCharOffsetContained))
             {
                 throw new ArgumentException(nameof(newMinimum));
             }
-            var bytesToRemove = newMinimum - LowestOffsetContained;
+            var charsToRemove = newMinimum - LowestCharOffsetContained;
+            var bytesToRemove = (int)(charsToRemove / 2);
             var newSize = this.WorkingMemory.Length - bytesToRemove;
             if (bytesToRemove > 0)
             {
+                var distanceFromZero = (LowestCharOffsetContained - newMinimum) / 2;
                 var newBytes = new byte[newSize];
                 Array.Copy(
                     sourceArray: WorkingMemory,
-                    sourceIndex: newMinimum,
+                    sourceIndex: distanceFromZero,
                     destinationArray: newBytes,
                     destinationIndex: 0,
                     length: newBytes.Length);

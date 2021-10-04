@@ -25,8 +25,8 @@
         {
             this.fasterKV = new FasterKVBBPiMiner();
             this.piBytes = new PiBuffer(
-                startingOffset: piBytesOffset,
-                maxCapacity: BufferMaxCapacity);
+                startingCharOffset: piBytesOffset,
+                maxByteCapacity: BufferMaxCapacity);
         }
 
         private async Task<WorkBlock> StartWork(long startingOffset)
