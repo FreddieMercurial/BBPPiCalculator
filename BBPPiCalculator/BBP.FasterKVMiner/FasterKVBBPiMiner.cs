@@ -49,8 +49,8 @@
                             comparer: null);
         }
 
-        private static string NSizeKey(int n, int blockSize) => string.Format("n{0}:b{1}", n, blockSize);
-        private static string NSizeValue(char firstDigit, string sha256) => string.Format("{0}:{1}", firstDigit, sha256);
+        private static string NSizeKey(long n, int blockSize) => string.Format("n{0}:b{1}", n, blockSize);
+        private static string NSizeValue(char firstDigit, string sha256) => string.Format("{0}:{1}", firstDigit, sha256.ToLowerInvariant());
         private static (char, string) NSizeValue(string storedValue)
         {
             var parts = storedValue.Split(
@@ -59,8 +59,8 @@
             return (parts[0][0], parts[1]);
         }
 
-        private static string SizeSHAKey(int blockSize, string sha256) => string.Format("b{0}:s{1}", blockSize, sha256);
-        private static string SizeSHAValue(int nOffset, string oldValue = null)
+        private static string SizeSHAKey(int blockSize, string sha256) => string.Format("b{0}:s{1}", blockSize, sha256.ToLowerInvariant());
+        private static string SizeSHAValue(long nOffset, string oldValue = null)
         {
             var nOffsetString = Convert.ToString(nOffset);
             return oldValue is null ? nOffsetString : string.Join(
@@ -68,16 +68,16 @@
                 oldValue,
                 nOffsetString);
         }
-        private static IEnumerable<int> SizeSHAValue(string storedValue) =>
+        private static IEnumerable<long> SizeSHAValue(string storedValue) =>
             storedValue
                 .Split(',')
-                .Select(value => Convert.ToInt32(value));
+                .Select(value => Convert.ToInt64(value));
 
         private static string NextSizeKey(int blockSize) => string.Format("nextBlock:{0}", blockSize);
-        private static string NextSizeValue(int n) => string.Format("{0}", n);
-        private static int NextSizeValue(string storedValue) => Convert.ToInt32(storedValue);
+        private static string NextSizeValue(long n) => string.Format("{0}", n);
+        private static long NextSizeValue(string storedValue) => Convert.ToInt64(storedValue);
 
-        public int AddComputation(int n, int blockSize, char firstDigit, string sha256)
+        public long AddComputation(long n, int blockSize, char firstChar, string sha256)
         {
             var nextSizeKey = NextSizeKey(blockSize: blockSize);
             var sizeSHAKey = SizeSHAKey(
@@ -94,7 +94,7 @@
 
             var nextSizeTuple = session.Read(
                 key: nextSizeKey);
-            int nextN = nextSizeTuple.status == Status.OK ? NextSizeValue(nextSizeTuple.output) : n + 1;
+            long nextN = nextSizeTuple.status == Status.OK ? NextSizeValue(nextSizeTuple.output) : n + 1;
 
             // update
             session.Upsert(
@@ -102,7 +102,7 @@
                     n: n,
                     blockSize: blockSize),
                 desiredValue: NSizeValue(
-                    firstDigit: firstDigit,
+                    firstDigit: firstChar,
                     sha256: sha256));
             session.Upsert(
                 key: sizeSHAKey,

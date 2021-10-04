@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BBP.FasterKVMiner
 {
-    public class PiByteBuffer
+    public class PiByteBuffer : IDisposable
     {
         private PiDigit piGenerator;
         private long LowestOffsetContained;
@@ -28,7 +28,7 @@ namespace BBP.FasterKVMiner
             this.mutex = new Mutex(false);
         }
 
-        public void Ensure(long minimum, long maximum, bool useMutex = true)
+        private void Ensure(long minimum, long maximum, bool useMutex = true)
         {
             if (maximum < minimum)
             {
@@ -153,6 +153,13 @@ namespace BBP.FasterKVMiner
                     length: newBytes.Length);
                 this.WorkingMemory = newBytes;
             }
+        }
+
+        public void Dispose()
+        {
+            this.mutex.WaitOne();
+            this.mutex.Dispose();
+            this.WorkingMemory = null;
         }
     }
 }

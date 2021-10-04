@@ -43,6 +43,20 @@
             }).ConfigureAwait(false);
         }
 
+        private async Task<WorkBlock> PerformComputation(long startingOffset)
+        {
+            var resultWorkBlock = await this.StartWork(startingOffset: startingOffset).ConfigureAwait(false);
+            foreach(var blockSize in resultWorkBlock.BlockSizes)
+            {
+                this.fasterKV.AddComputation(
+                    n: resultWorkBlock.StartingOffset,
+                    blockSize: blockSize,
+                    firstChar: resultWorkBlock.FirstCharacter,
+                    sha256: Convert.ToHexString(resultWorkBlock.BlockSizesHashes[blockSize]));
+            }
+            return resultWorkBlock;
+        }
+
         public void Dispose()
         {
             this.fasterKV.Dispose();
