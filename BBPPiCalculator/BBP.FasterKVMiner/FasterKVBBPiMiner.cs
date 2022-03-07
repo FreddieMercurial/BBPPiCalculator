@@ -25,8 +25,9 @@ public class FasterKVBBPiMiner : IDisposable
     /// </summary>
     private readonly bool useReadCache = false;
 
-    public FasterKVBBPiMiner()
+    public FasterKVBBPiMiner(string baseDirectory)
     {
+        this.baseDirectory = new DirectoryInfo(path: baseDirectory);
         var cacheDir = GetDiskCacheDirectory().FullName;
         fasterPiLogDevice = CreateLogDevice(nameSpace: "pi-log");
         fasterPiObjectDevice = CreateLogDevice(nameSpace: "pi-object");
@@ -58,9 +59,9 @@ public class FasterKVBBPiMiner : IDisposable
         return $"n{n}:b{blockSize}";
     }
 
-    private static string NSizeValue(char firstDigit, string sha256)
+    private static string NSizeValue(byte firstByte, string sha256)
     {
-        return $"{firstDigit}:{sha256.ToLowerInvariant()}";
+        return $"{firstByte:X}:{sha256.ToLowerInvariant()}";
     }
 
     private static (char, string) NSizeValue(string storedValue)
@@ -71,12 +72,12 @@ public class FasterKVBBPiMiner : IDisposable
         return (parts[0][index: 0], parts[1]);
     }
 
-    private static string SizeSHAKey(int blockSize, string sha256)
+    private static string SizeShaKey(int blockSize, string sha256)
     {
         return $"b{blockSize}:s{sha256.ToLowerInvariant()}";
     }
 
-    private static string SizeSHAValue(long nOffset, string? oldValue = null)
+    private static string SizeShaValue(long nOffset, string? oldValue = null)
     {
         var nOffsetString = Convert.ToString(value: nOffset);
         return oldValue is null
@@ -127,20 +128,15 @@ public class FasterKVBBPiMiner : IDisposable
     private void SetNextN(int blockSize, long nextN,
         ClientSession<string, string, string, string, object, IFunctions<string, string, string, string, object>>? session = null)
     {
-        if (session is null)
-        {
-            fasterPiStore.NewSession(
-                functions: new SimpleFunctions<string, string>());
-        }
-
-        session.Upsert(
+        session ??= fasterPiStore.NewSession(functions: new SimpleFunctions<string, string, object>());
+        session!.Upsert(
             key: NextSizeKey(blockSize: blockSize),
             desiredValue: NextSizeValue(n: nextN));
     }
 
-    public void AddComputation(long n, int blockSize, char firstChar, string sha256)
+    public void AddComputation(long n, int blockSize, byte firstByte, string sha256)
     {
-        var sizeSHAKey = SizeSHAKey(
+        var sizeShaKey = SizeShaKey(
             blockSize: blockSize,
             sha256: sha256);
 
@@ -148,9 +144,9 @@ public class FasterKVBBPiMiner : IDisposable
             functions: new SimpleFunctions<string, string, object>());
 
         // read
-        var sizeSHAOldValueTuple = session.Read(
-            key: sizeSHAKey);
-        var sizeSHAOldValue = sizeSHAOldValueTuple.status == Status.OK ? sizeSHAOldValueTuple.output : null;
+        var (status, output) = session.Read(
+            key: sizeShaKey);
+        var sizeShaOldValue = status == Status.OK ? output : null;
 
         // update
         session.Upsert(
@@ -158,11 +154,11 @@ public class FasterKVBBPiMiner : IDisposable
                 n: n,
                 blockSize: blockSize),
             desiredValue: NSizeValue(
-                firstDigit: firstChar,
+                firstByte: firstByte,
                 sha256: sha256));
         session.Upsert(
-            key: sizeSHAKey,
-            desiredValue: SizeSHAValue(nOffset: n));
+            key: sizeShaKey,
+            desiredValue: SizeShaValue(nOffset: n));
         session.CompletePending(
             wait: false);
     }
@@ -212,7 +208,8 @@ public class FasterKVBBPiMiner : IDisposable
 
     private IDevice CreateLogDevice(string nameSpace)
     {
-        var devicePath = GetDevicePath(nameSpace: nameSpace, cacheDirectoryInfo: out var _);
+        var devicePath = GetDevicePath(nameSpace: nameSpace,
+            cacheDirectoryInfo: out var _);
 
         return Devices.CreateLogDevice(
             logPath: devicePath);

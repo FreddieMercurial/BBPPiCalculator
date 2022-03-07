@@ -32,7 +32,8 @@ public static class BBPCalculator
     {
         if (n < 0)
         {
-            throw new ArgumentOutOfRangeException(paramName: nameof(n), message: "n must be greater than or equal to 0");
+            throw new ArgumentOutOfRangeException(paramName: nameof(n),
+                message: "n must be greater than or equal to 0");
         }
 
         long offset = 0;
@@ -58,7 +59,8 @@ public static class BBPCalculator
     {
         if (n < 0)
         {
-            throw new ArgumentOutOfRangeException(paramName: nameof(n), message: "n must be greater than or equal to 0");
+            throw new ArgumentOutOfRangeException(paramName: nameof(n),
+                message: "n must be greater than or equal to 0");
         }
 
         long offset = 0;
@@ -144,14 +146,19 @@ public static class BBPCalculator
         string hexDigits; // the hexidecimal digits
 
         // calc the summations
-        s1 = Series(m: 1, n: n);
-        s2 = Series(m: 4, n: n);
-        s3 = Series(m: 5, n: n);
-        s4 = Series(m: 6, n: n);
+        s1 = Series(m: 1,
+            n: n);
+        s2 = Series(m: 4,
+            n: n);
+        s3 = Series(m: 5,
+            n: n);
+        s4 = Series(m: 6,
+            n: n);
 
         pid = (4d * s1) - (2d * s2) - s3 - s4; // transform the summations
         pid = pid - (long)pid + 1d; // create the fraction
-        hexDigits = HexString(x: pid, numDigits: NumHexDigits); // convert the fraction to the hex digit slice      
+        hexDigits = HexString(x: pid,
+            numDigits: NumHexDigits); // convert the fraction to the hex digit slice      
 
         return new BBPResult {Digit = n, HexDigits = hexDigits[..NativeChunkSizeInChars]};
     }
@@ -209,7 +216,8 @@ public static class BBPCalculator
         {
             denominator = (8 * k) + m;
             double power = n - k;
-            term = ModPow16(p: power, m: denominator);
+            term = ModPow16(p: power,
+                m: denominator);
             sum += term / denominator;
             sum -= (long)sum;
         }
@@ -218,7 +226,8 @@ public static class BBPCalculator
         for (var k = n; k <= n + 100; k++)
         {
             denominator = (8 * k) + m;
-            term = Math.Pow(x: 16d, y: n - k) / denominator;
+            term = Math.Pow(x: 16d,
+                y: n - k) / denominator;
             if (term < Epsilon)
             {
                 break;

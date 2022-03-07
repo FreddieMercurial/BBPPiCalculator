@@ -34,7 +34,8 @@ public sealed class DefaultCommand : AsyncCommand<DefaultCommand.Settings>
         _console = console;
         _fileSystem = new FileSystem();
         _environment = new Environment();
-        _globber = new Globber(fileSystem: _fileSystem, environment: _environment);
+        _globber = new Globber(fileSystem: _fileSystem,
+            environment: _environment);
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
@@ -46,7 +47,8 @@ public sealed class DefaultCommand : AsyncCommand<DefaultCommand.Settings>
 
     public sealed class Settings : CommandSettings
     {
-        [CommandArgument(position: 0, template: "[EXAMPLE]")]
+        [CommandArgument(position: 0,
+            template: "[EXAMPLE]")]
         [Description(description: "The example to run.\nIf none is specified, all examples will be listed")]
         public string Name { get; set; }
     }

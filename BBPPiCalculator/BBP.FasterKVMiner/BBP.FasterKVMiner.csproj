@@ -15,16 +15,16 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.FASTER.Core" Version="1.9.14" />
-    <PackageReference Include="Spectre.Cli" Version="0.49.0" />
-    <PackageReference Include="Spectre.Console" Version="0.43.0" />
-    <PackageReference Include="CliWrap" Version="3.4.1" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0" />
-    <PackageReference Include="MinVer" PrivateAssets="All" Version="3.0.0-alpha.1" />
-    <PackageReference Include="Spectre.IO" Version="0.8.0" />
+    <PackageReference Include="Microsoft.FASTER.Core" Version="1.9.14"/>
+    <PackageReference Include="Spectre.Cli" Version="0.49.0"/>
+    <PackageReference Include="Spectre.Console" Version="0.43.0"/>
+    <PackageReference Include="CliWrap" Version="3.4.1"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0"/>
+    <PackageReference Include="MinVer" PrivateAssets="All" Version="3.0.0-alpha.1"/>
+    <PackageReference Include="Spectre.IO" Version="0.8.0"/>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\NeuralFabric\NeuralFabric.csproj" />
-    <ProjectReference Include="..\BBP\BBP.csproj" />
+    <ProjectReference Include="..\..\..\NeuralFabric\NeuralFabric.csproj"/>
+    <ProjectReference Include="..\BBP\BBP.csproj"/>
   </ItemGroup>
 </Project>

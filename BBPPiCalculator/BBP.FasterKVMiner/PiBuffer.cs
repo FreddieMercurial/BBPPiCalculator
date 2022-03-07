@@ -1,209 +1,134 @@
-﻿namespace BBP.FasterKVMiner;
+﻿using System.Collections.Immutable;
 
-public class PiBuffer : IDisposable
+namespace BBP.FasterKVMiner;
+
+public class PiBuffer
 {
-    private readonly int MaximumByteCapacity;
-    private readonly Mutex mutex;
-    private long HighestCharOffsetContained;
-    private long LowestCharOffsetContained;
-    private Dictionary<int, Queue<PiByte>> PiDigitQueuesByLength;
-    private byte[] WorkingMemory;
+    /// <summary>
+    ///     Block lengths being evaluated.
+    /// </summary>
+    private readonly int[] _blockLengths;
 
-    public PiBuffer(long startingCharOffset, int maxByteCapacity)
+    /// <summary>
+    ///     Queues of piBytes sorted by the number of bytes in each block size
+    /// </summary>
+    private readonly ImmutableDictionary<int, Queue<PiByte>> _digitQuesByBlockLength;
+
+    /// <summary>
+    ///     First offset evaluated.
+    /// </summary>
+    private readonly long _firstOffset;
+
+    /// <summary>
+    ///     Last offset to be evaluated.
+    /// </summary>
+    private readonly long _lastOffset;
+
+    /// <summary>
+    ///     Current offset being evaluated.
+    /// </summary>
+    private long _offset;
+
+    /// <summary>
+    /// </summary>
+    /// <param name="offset"></param>
+    /// <param name="blockLengths"></param>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="ArgumentNullException"></exception>
+    public PiBuffer(long offset, int[] blockLengths)
     {
-        if (startingCharOffset < 0)
+        if (offset < 0)
         {
-            throw new ArgumentException(message: null, paramName: nameof(startingCharOffset));
+            throw new ArgumentException(message: null,
+                paramName: nameof(offset));
         }
 
-        if (maxByteCapacity < BBPCalculator.NativeChunkSizeInChars)
+        if (!blockLengths.Any())
         {
-            throw new ArgumentException(message: null, paramName: nameof(maxByteCapacity));
+            throw new ArgumentNullException(paramName: nameof(blockLengths));
         }
 
-        MaximumByteCapacity = maxByteCapacity;
-        LowestCharOffsetContained = startingCharOffset;
-        HighestCharOffsetContained = startingCharOffset + BBPCalculator.NativeChunkSizeInChars;
-        var memorySize = (int)(HighestCharOffsetContained - LowestCharOffsetContained);
-        WorkingMemory = BBPCalculator.PiBytes(
-            n: LowestCharOffsetContained,
-            count: memorySize).ToArray();
-        PiDigitQueuesByLength = new Dictionary<int, Queue<PiByte>>();
-        mutex = new Mutex(initiallyOwned: false);
+        var longestBlock = blockLengths.Max();
+        if (longestBlock < BBPCalculator.NativeChunkSizeInChars)
+        {
+            throw new ArgumentException(message: null,
+                paramName: nameof(blockLengths));
+        }
+
+        var digitQueues = new Dictionary<int, Queue<PiByte>>();
+        foreach (var blockLength in blockLengths)
+        {
+            digitQueues[key: blockLength] = new Queue<PiByte>();
+        }
+
+        _firstOffset = offset;
+        _lastOffset = _offset + longestBlock;
+        _offset = offset;
+        _blockLengths = blockLengths;
+        _digitQuesByBlockLength = digitQueues.ToImmutableDictionary();
     }
 
-    private (long, long) CurrentRangeUnsafe
-        => (LowestCharOffsetContained, HighestCharOffsetContained);
+    /// <summary>
+    ///     First offset evaluated
+    /// </summary>
+    public long FirstOffset => _firstOffset;
 
-    public (long, long) CurrentRange
+    /// <summary>
+    ///     Last offset to be evaluated
+    /// </summary>
+    public long LastOffset => _lastOffset;
+
+    /// <summary>
+    ///     Execute a work unit.
+    /// </summary>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    public async IAsyncEnumerable<PiBlock> Work()
     {
-        get
-        {
-            mutex.WaitOne();
-            var range = CurrentRangeUnsafe;
-            mutex.ReleaseMutex();
-            return range;
-        }
-    }
+        using var tokenSource = new CancellationTokenSource();
+        var cancellationToken = tokenSource.Token;
+        var offset = _offset++;
+        var task = new Task<byte[]>(function: () => BBPCalculator.PiBytes(
+            n: offset,
+            count: _blockLengths.Max()).ToArray());
 
-    public void Dispose()
-    {
-        mutex.WaitOne();
-        mutex.Dispose();
-    }
+        var piBytes = await task
+            .WaitAsync(cancellationToken: cancellationToken)
+            .ConfigureAwait(continueOnCapturedContext: false);
 
-    private void Ensure(long minimum, long maximum, bool useMutex = true)
-    {
-        if (minimum < 0 || minimum > maximum)
+        foreach (var piByte in piBytes)
         {
-            throw new ArgumentException(message: null, paramName: nameof(minimum));
-        }
-
-        if (maximum < minimum)
-        {
-            throw new ArgumentException(message: null, paramName: nameof(maximum));
-        }
-
-        if ((maximum - minimum) % 2 != 0)
-        {
-            throw new ArgumentException(message: "spread must be multiple of 2 characters");
-        }
-
-        if (
-            minimum >= LowestCharOffsetContained &&
-            minimum <= HighestCharOffsetContained &&
-            maximum >= LowestCharOffsetContained &&
-            maximum <= HighestCharOffsetContained
-        )
-        {
-            return;
-        }
-
-        try
-        {
-            if (useMutex)
+            foreach (var blockLength in _blockLengths)
             {
-                mutex.WaitOne();
-            }
+                _digitQuesByBlockLength[key: blockLength].Enqueue(
+                    item: new PiByte(
+                        N: offset,
+                        Value: piByte));
 
-            GarbageCollect(
-                requestedMinimum: minimum,
-                requestedMaximum: maximum);
+                if (_digitQuesByBlockLength.Count <= blockLength)
+                {
+                    continue;
+                }
 
-            if (minimum < LowestCharOffsetContained)
-            {
-                // add bytes on the left
-                var charsNeeded = (int)(LowestCharOffsetContained - minimum);
-                var bytesNeeded = charsNeeded / 2;
-                var leftMemory = BBPCalculator.PiBytes(
-                    n: minimum,
-                    count: bytesNeeded).ToArray();
-                Array.Resize(array: ref leftMemory, newSize: WorkingMemory.Length + bytesNeeded);
-                Array.Copy(
-                    sourceArray: WorkingMemory,
-                    sourceIndex: 0,
-                    destinationArray: leftMemory,
-                    destinationIndex: bytesNeeded,
-                    length: WorkingMemory.Length);
-                WorkingMemory = leftMemory;
-                LowestCharOffsetContained = minimum;
-            }
+                _digitQuesByBlockLength[key: blockLength].Dequeue();
+                var piBytesForLength = _digitQuesByBlockLength[key: blockLength].ToArray();
+                if (piBytesForLength.Any(predicate: p => p.N != offset))
+                {
+                    throw new Exception(message: "PiBuffer: n _offset mismatch");
+                }
 
-            if (maximum > HighestCharOffsetContained)
-            {
-                var charsNeeded = (int)(maximum - HighestCharOffsetContained);
-                var bytesNeeded = charsNeeded / 2;
-                var rightMemory = BBPCalculator.PiBytes(
-                    n: HighestCharOffsetContained + 1,
-                    count: bytesNeeded).ToArray();
-                var oldLength = WorkingMemory.Length;
-                Array.Resize(array: ref WorkingMemory, newSize: oldLength + bytesNeeded);
-                Array.Copy(
-                    sourceArray: rightMemory,
-                    sourceIndex: 0,
-                    destinationArray: WorkingMemory,
-                    destinationIndex: oldLength,
-                    length: bytesNeeded);
-                HighestCharOffsetContained = maximum;
-            }
-        }
-        finally
-        {
-            if (useMutex)
-            {
-                mutex.ReleaseMutex();
+                var aggregate = piBytesForLength.Select(selector: p => p.Value).ToArray();
+                if (aggregate.Length != blockLength)
+                {
+                    throw new Exception();
+                }
+
+                Console.WriteLine(value: $"Completed {blockLength} block at offset {offset}");
+
+                yield return new PiBlock(
+                    N: offset,
+                    Values: aggregate);
             }
         }
-    }
-
-    public byte[] GetPiSegment(long minimum, long maximum)
-    {
-        if ((maximum - minimum) % 2 != 0)
-        {
-            throw new ArgumentException(message: "spread must be multiple of 2 characters");
-        }
-
-        try
-        {
-            mutex.WaitOne();
-
-            var charsNeeded = maximum - minimum;
-            var bytesNeeded = (int)(charsNeeded / 2);
-            var returnArray = new byte[bytesNeeded];
-
-            Ensure(
-                minimum: minimum,
-                maximum: maximum,
-                useMutex: false);
-
-            var distanceFromZero = (LowestCharOffsetContained - minimum) / 2;
-            Array.Copy(
-                sourceArray: WorkingMemory,
-                sourceIndex: distanceFromZero,
-                destinationArray: returnArray,
-                destinationIndex: 0,
-                length: returnArray.Length);
-
-            return returnArray;
-        }
-        finally
-        {
-            mutex.ReleaseMutex();
-        }
-    }
-
-    private void GarbageCollect(long requestedMinimum, long requestedMaximum)
-    {
-        var charsRequested = requestedMaximum - requestedMinimum;
-        if (charsRequested / 2 > MaximumByteCapacity)
-        {
-            PruneLeft(newMinimum: requestedMaximum);
-        }
-    }
-
-    private void PruneLeft(long newMinimum)
-    {
-        if (newMinimum < LowestCharOffsetContained || newMinimum > HighestCharOffsetContained)
-        {
-            throw new ArgumentException(message: null, paramName: nameof(newMinimum));
-        }
-
-        var charsToRemove = newMinimum - LowestCharOffsetContained;
-        var bytesToRemove = (int)(charsToRemove / 2);
-        var newSize = WorkingMemory.Length - bytesToRemove;
-        if (bytesToRemove <= 0)
-        {
-            return;
-        }
-
-        var distanceFromZero = (LowestCharOffsetContained - newMinimum) / 2;
-        var newBytes = new byte[newSize];
-        Array.Copy(
-            sourceArray: WorkingMemory,
-            sourceIndex: distanceFromZero,
-            destinationArray: newBytes,
-            destinationIndex: 0,
-            length: newBytes.Length);
-        WorkingMemory = newBytes;
     }
 }
