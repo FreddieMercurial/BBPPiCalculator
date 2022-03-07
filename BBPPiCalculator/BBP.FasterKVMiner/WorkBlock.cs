@@ -1,52 +1,59 @@
 ﻿using System.Collections.Immutable;
 using System.Security.Cryptography;
 
-namespace BBP.FasterKVMiner
+namespace BBP.FasterKVMiner;
+
+public class WorkBlock : IWorkable
 {
-    public class WorkBlock : IWorkable
+    private readonly Dictionary<int, byte[]> BlockSizeHashBuffer;
+    public readonly int[] BlockSizes;
+    public readonly long StartingOffset;
+    private char firstCharacter;
+
+    public WorkBlock(long startingOffset, int[] blockSizes)
     {
-        public readonly long StartingOffset;
-        public readonly int[] BlockSizes;
-        private readonly Dictionary<int, byte[]> BlockSizeHashBuffer;
-        public ImmutableDictionary<int, byte[]> BlockSizesHashes
-            => this.completed ? BlockSizeHashBuffer.ToImmutableDictionary() : throw new Exception("result not complete");
-        public IWorkable AsWorkable() => this;
-        private bool completed = false;
-        private char firstCharacter;
-        public bool Completed => this.completed;
-        public char FirstCharacter => this.completed ? this.firstCharacter : throw new Exception("result not complete");
-        public WorkBlock(long startingOffset, int[] blockSizes)
+        StartingOffset = startingOffset;
+        BlockSizes = blockSizes;
+        BlockSizeHashBuffer = new Dictionary<int, byte[]>();
+    }
+
+    public ImmutableDictionary<int, byte[]> BlockSizesHashes
+        => Completed ? BlockSizeHashBuffer.ToImmutableDictionary() : throw new Exception(message: "result not complete");
+
+    public bool Completed { get; private set; }
+
+    public char FirstCharacter => Completed ? firstCharacter : throw new Exception(message: "result not complete");
+
+    WorkBlock IWorkable.Work(PiBuffer workingMemory)
+    {
+        // from the given digit index, compute all sha 256 hashes of all block sizes beginning at that index
+        // get the longest block size and then get that many pi bytes from here
+        var maxBlockSize = BlockSizes.Max();
+        var activeSegment = workingMemory.GetPiSegment(
+            minimum: StartingOffset,
+            maximum: StartingOffset + maxBlockSize);
+
+        firstCharacter = Convert.ToString(
+            value: (byte)((activeSegment[0] >> 4) & 0x0F),
+            toBase: 16)[index: 0];
+
+        foreach (var blockSize in BlockSizes)
         {
-            this.StartingOffset = startingOffset;
-            this.BlockSizes = blockSizes;
-            this.BlockSizeHashBuffer = new Dictionary<int, byte[]>();
-        }
-
-        WorkBlock IWorkable.Work(PiBuffer workingMemory)
-        {
-            // from the given digit index, compute all sha 256 hashes of all block sizes beginning at that index
-            // get the longest block size and then get that many pi bytes from here
-            var maxBlockSize = this.BlockSizes.Max();
-            var activeSegment = workingMemory.GetPiSegment(
-                minimum: this.StartingOffset,
-                maximum: this.StartingOffset + maxBlockSize);
-
-            this.firstCharacter = Convert.ToString(
-                value: (byte)((activeSegment[0] >> 4) & 0x0F),
-                toBase: 16)[0];
-
-            foreach (var blockSize in this.BlockSizes)
+            using (var sha256 = SHA256.Create())
             {
-                using (var sha256 = SHA256.Create())
-                {
-                    this.BlockSizeHashBuffer[blockSize] = sha256.ComputeHash(
-                        buffer: activeSegment,
-                        offset: 0,
-                        count: blockSize);
-                }
+                BlockSizeHashBuffer[key: blockSize] = sha256.ComputeHash(
+                    buffer: activeSegment,
+                    offset: 0,
+                    count: blockSize);
             }
-            this.completed = true;
-            return this;
         }
+
+        Completed = true;
+        return this;
+    }
+
+    public IWorkable AsWorkable()
+    {
+        return this;
     }
 }

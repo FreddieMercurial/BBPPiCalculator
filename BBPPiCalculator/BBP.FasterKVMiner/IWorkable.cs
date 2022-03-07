@@ -1,10 +1,9 @@
-﻿namespace BBP.FasterKVMiner
+﻿namespace BBP.FasterKVMiner;
+
+public interface IWorkable
 {
-    public interface IWorkable
+    WorkBlock Work(PiBuffer workingMemory)
     {
-        WorkBlock Work(PiBuffer workingMemory)
-        {
-            throw new NotImplementedException();
-        }
+        throw new NotImplementedException();
     }
 }

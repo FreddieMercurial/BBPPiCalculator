@@ -1,64 +1,59 @@
-﻿using BBP;
+﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using System;
 
-namespace BBP.FasterKVMiner.Test
+namespace BBP.FasterKVMiner.Test;
+
+[TestClass]
+public class FasterKVBBPiMinerTests
 {
-    [TestClass]
-    public class FasterKVBBPiMinerTests
+    private MockRepository mockRepository;
+
+
+    [TestInitialize]
+    public void TestInitialize()
     {
-        private MockRepository mockRepository;
+        mockRepository = new MockRepository(defaultBehavior: MockBehavior.Strict);
+    }
 
+    private FasterKVBBPiMiner CreateFasterKVBBPiMiner()
+    {
+        return new FasterKVBBPiMiner();
+    }
 
+    [TestMethod]
+    public void AddComputation_StateUnderTest_ExpectedBehavior()
+    {
+        // Arrange
+        var fasterKVBBPiMiner = CreateFasterKVBBPiMiner();
+        long n = 0;
+        var blockSize = 0;
+        var firstChar = default(Char);
+        string sha256 = null;
 
-        [TestInitialize]
-        public void TestInitialize()
-        {
-            this.mockRepository = new MockRepository(MockBehavior.Strict);
+        // Act
+        fasterKVBBPiMiner.AddComputation(
+            n: n,
+            blockSize: blockSize,
+            firstChar: firstChar,
+            sha256: sha256);
 
+        // Assert
+        Assert.Fail();
+        mockRepository.VerifyAll();
+    }
 
-        }
+    [TestMethod]
+    public void Dispose_StateUnderTest_ExpectedBehavior()
+    {
+        // Arrange
+        var fasterKVBBPiMiner = CreateFasterKVBBPiMiner();
 
-        private FasterKVBBPiMiner CreateFasterKVBBPiMiner()
-        {
-            return new FasterKVBBPiMiner();
-        }
+        // Act
+        fasterKVBBPiMiner.Dispose();
 
-        [TestMethod]
-        public void AddComputation_StateUnderTest_ExpectedBehavior()
-        {
-            // Arrange
-            var fasterKVBBPiMiner = this.CreateFasterKVBBPiMiner();
-            long n = 0;
-            int blockSize = 0;
-            char firstChar = default(global::System.Char);
-            string sha256 = null;
-
-            // Act
-            fasterKVBBPiMiner.AddComputation(
-                n,
-                blockSize,
-                firstChar,
-                sha256);
-
-            // Assert
-            Assert.Fail();
-            this.mockRepository.VerifyAll();
-        }
-
-        [TestMethod]
-        public void Dispose_StateUnderTest_ExpectedBehavior()
-        {
-            // Arrange
-            var fasterKVBBPiMiner = this.CreateFasterKVBBPiMiner();
-
-            // Act
-            fasterKVBBPiMiner.Dispose();
-
-            // Assert
-            Assert.Fail();
-            this.mockRepository.VerifyAll();
-        }
+        // Assert
+        Assert.Fail();
+        mockRepository.VerifyAll();
     }
 }
