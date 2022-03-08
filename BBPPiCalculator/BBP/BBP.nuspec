@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package >
+  <metadata>
+    <id>Bailey-Borwein-Plouffe</id>
+    <version>1.1.1</version>
+    <title>Bailey-Borwein-Plouffe Pi base N</title>
+    <authors>JessicaMulein</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="expression">MIT</license>
+    <!-- <icon>icon.png</icon> -->
+    <projectUrl>https://github.com/FreddieMercurial/BBPPiCalculator</projectUrl>
+    <description>The BBP formula was accidentally discovered in 1995 but it changed the landscape of our understanding of how to calculate certain numbers such as Pi and e. It uses a series of summations to calculate a hexidecimal stream of the floating point portion of Pi.</description>
+    <releaseNotes>Refactoring and improvements</releaseNotes>
+    <copyright>(c) Copyright Jessica Mulein 2022. All rights reserved.</copyright>
+    <tags>bailey-borwein-plouffe pi</tags>
+  </metadata>
+</package>
