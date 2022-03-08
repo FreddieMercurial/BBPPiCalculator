@@ -24,14 +24,12 @@ internal class Program
 
 public sealed class DefaultCommand : AsyncCommand<DefaultCommand.Settings>, IDisposable
 {
-    private readonly IAnsiConsole _console;
     private readonly IEnvironment _environment;
     private readonly IFileSystem _fileSystem;
     private readonly Tracker _tracker;
 
     public DefaultCommand(IAnsiConsole console)
     {
-        _console = console;
         _fileSystem = new FileSystem();
         _environment = new Environment();
 
@@ -45,8 +43,13 @@ public sealed class DefaultCommand : AsyncCommand<DefaultCommand.Settings>, IDis
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
-        _console.Clear();
-        await _tracker.Run().ConfigureAwait(false);
+        Console.Clear();
+        Console.WriteLine(value: "Beginning execution...");
+        await foreach (var workBlock in _tracker.Run())
+        {
+            Console.WriteLine(value: $"Block emitted: @{workBlock.StartingOffset}");
+        }
+
         return 0;
     }
 

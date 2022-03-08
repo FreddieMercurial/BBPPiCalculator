@@ -4,8 +4,8 @@ namespace BBP;
 
 /// <summary>
 ///     Used to generate the [n]th digit of Pi in base16 (hex). This algorithm creates
-///     a hex 'slice' that is part of the hexidecimal stream if you were to represent
-///     Pi as a hexidecimal number.
+///     a hex 'slice' that is part of the hexadecimal stream if you were to represent
+///     Pi as a hexadecimal number.
 ///     The formulaic code was borrowed from:
 ///     http://latkin.org/blog/2012/11/03/the-bailey-borwein-plouffe-algorithm-in-c-and-f/
 ///     And the original formula by the author above was borrowed from Bailey (of BBP):
@@ -18,7 +18,7 @@ namespace BBP;
 ///     - Converted the functional logic to a standardized class structure.
 ///     - Added more in depth commentary
 ///     - Added parallelization for certain tasks
-///     Verified the hexidecimal output by cross referencing this whitepaper:
+///     Verified the hexadecimal output by cross referencing this whitepaper:
 ///     http://crd-legacy.lbl.gov/~dhbailey/dhbpapers/bbp-alg.pdf
 ///     Pi in Hexidecimal:
 ///     http://calccrypto.wikidot.com/math:pi-hex
@@ -163,10 +163,10 @@ public static class BBPCalculator
     }
 
     /// <summary>
-    ///     Calculates the [n]th hexidecimal digit of Pi.
+    ///     Calculates the [n]th hexadecimal digit of Pi.
     /// </summary>
     /// <param name="n">The digit of Pi which you wish to solve for.</param>
-    /// <returns>Returns ten hexidecimal values of Pi from the offset (n).</returns>
+    /// <returns>Returns ten hexadecimal values of Pi from the offset (n).</returns>
     public static async Task<BBPResult> CalculateAsync(long n)
     {
         return await Task
@@ -176,7 +176,7 @@ public static class BBPCalculator
     }
 
     /// <summary>
-    ///     Converts the fraction to a hexidecimal string. Multiply by 16
+    ///     Converts the fraction to a hexadecimal string. Multiply by 16
     ///     and take the whole number on each round and then convert it to
     ///     it's hex equivalent.
     /// </summary>

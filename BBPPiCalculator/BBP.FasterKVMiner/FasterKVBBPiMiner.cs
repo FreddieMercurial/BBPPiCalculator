@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using FASTER.core;
 
 namespace BBP;
@@ -25,12 +26,17 @@ public class FasterKVBBPiMiner : IDisposable
     /// </summary>
     private readonly bool useReadCache = false;
 
+    [SuppressMessage(category: "ReSharper.DPA",
+        checkId: "DPA0003: Excessive memory allocations in LOH",
+        MessageId = "type: FASTER.core.HashBucket[]")]
     public FasterKVBBPiMiner(string baseDirectory)
     {
         this.baseDirectory = new DirectoryInfo(path: baseDirectory);
-        var cacheDir = GetDiskCacheDirectory().FullName;
-        fasterPiLogDevice = CreateLogDevice(nameSpace: "pi-log");
-        fasterPiObjectDevice = CreateLogDevice(nameSpace: "pi-object");
+        var cacheDir = GetDiskCacheDirectory(baseDirectory: this.baseDirectory).FullName;
+        fasterPiLogDevice = CreateLogDevice(baseDirectory: this.baseDirectory,
+            nameSpace: "pi-log");
+        fasterPiObjectDevice = CreateLogDevice(baseDirectory: this.baseDirectory,
+            nameSpace: "pi-object");
         // KEY                          VALUE
         // (n, blockSize)               (firstDigit, sha256 of block)
         // (blockSize, sha256)          (n-offset,n-offset,...)
@@ -113,16 +119,14 @@ public class FasterKVBBPiMiner : IDisposable
     private long GetNextN(int blockSize,
         ClientSession<string, string, string, string, object, IFunctions<string, string, string, string, object>>? session = null)
     {
-        if (session is null)
-        {
-            fasterPiStore.NewSession(
-                functions: new SimpleFunctions<string, string>());
-        }
+        session ??= fasterPiStore.NewSession(
+            functions: new SimpleFunctions<string, string, object>());
 
-        var nextSizeTuple = session.Read(
+        var (status, output) = session.Read(
             key: NextSizeKey(
                 blockSize: blockSize));
-        return nextSizeTuple.status == Status.OK ? NextSizeValue(storedValue: nextSizeTuple.output) : 0;
+
+        return status == Status.OK ? NextSizeValue(storedValue: output) : 0;
     }
 
     private void SetNextN(int blockSize, long nextN,
@@ -176,17 +180,12 @@ public class FasterKVBBPiMiner : IDisposable
         return new CheckpointSettings {CheckpointDir = cacheDir};
     }
 
-    private DirectoryInfo EnsuredDirectory(string dir)
+    private static DirectoryInfo EnsuredDirectory(string dir)
     {
-        if (!Directory.Exists(path: dir))
-        {
-            return Directory.CreateDirectory(path: dir);
-        }
-
-        return new DirectoryInfo(path: dir);
+        return !Directory.Exists(path: dir) ? Directory.CreateDirectory(path: dir) : new DirectoryInfo(path: dir);
     }
 
-    private DirectoryInfo GetDiskCacheDirectory()
+    private static DirectoryInfo GetDiskCacheDirectory(DirectoryInfo baseDirectory)
     {
         return Directory.CreateDirectory(
             path: Path.Combine(
@@ -194,9 +193,9 @@ public class FasterKVBBPiMiner : IDisposable
                 path2: "PiMiner"));
     }
 
-    private string GetDevicePath(string nameSpace, out DirectoryInfo cacheDirectoryInfo)
+    private static string GetDevicePath(DirectoryInfo baseDirectory, string nameSpace, out DirectoryInfo cacheDirectoryInfo)
     {
-        cacheDirectoryInfo = GetDiskCacheDirectory();
+        cacheDirectoryInfo = GetDiskCacheDirectory(baseDirectory: baseDirectory);
 
         return Path.Combine(
             path1: cacheDirectoryInfo.FullName,
@@ -206,9 +205,11 @@ public class FasterKVBBPiMiner : IDisposable
                 arg0: nameSpace));
     }
 
-    private IDevice CreateLogDevice(string nameSpace)
+    private static IDevice CreateLogDevice(DirectoryInfo baseDirectory, string nameSpace)
     {
-        var devicePath = GetDevicePath(nameSpace: nameSpace,
+        var devicePath = GetDevicePath(
+            baseDirectory: baseDirectory,
+            nameSpace: nameSpace,
             cacheDirectoryInfo: out var _);
 
         return Devices.CreateLogDevice(

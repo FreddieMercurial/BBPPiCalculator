@@ -5,84 +5,127 @@ public class Tracker : IDisposable
     private const int MaxThreadCount = 10;
 
     private readonly int[] _blockSizes;
+    private readonly List<long> _failedOffsetsToRetry;
     private readonly FasterKVBBPiMiner _fasterKv;
 
     private readonly PiBuffer[] _piBytes;
-    private readonly Mutex _threadMutex = new();
-    private readonly Thread[] _threads;
+    private readonly CancellationTokenSource _tokenSource;
     private long _piBytesOffset;
+    private readonly bool[] _running;
+    private readonly Task[] _tasks;
+    private readonly WorkBlock?[] _workBlocks;
 
     public Tracker(string baseDirectory)
     {
+        _failedOffsetsToRetry = new List<long>();
+        _tokenSource = new CancellationTokenSource();
         _fasterKv = new FasterKVBBPiMiner(baseDirectory: baseDirectory);
         _blockSizes = new[] {128, 256, 512, 1024, 4096, 1048576, 4194304};
-        _threads = new Thread[MaxThreadCount];
+        _tasks = new Task[MaxThreadCount];
+        _workBlocks = new WorkBlock[MaxThreadCount];
+        _running = new bool[MaxThreadCount];
         _piBytes = new PiBuffer[MaxThreadCount];
         for (var threadId = 0; threadId < MaxThreadCount; threadId++)
         {
-            var id = threadId;
-
-            _piBytes[id] = new PiBuffer(
+            _piBytes[threadId] = new PiBuffer(
                 offset: _piBytesOffset,
                 blockLengths: _blockSizes);
-            _threads[id] = new Thread(start: () => ThreadStart(threadId: id));
         }
-    }
-
-    private async void ThreadStart(int threadId)
-    {
-        _threadMutex.WaitOne();
-        var startingOffset = _piBytesOffset;
-        _piBytesOffset += BBPCalculator.NativeChunkSizeInChars;
-        _threadMutex.ReleaseMutex();
-
-        var completedBlock = await WorkAndLogComputation(
-                startingOffset: startingOffset,
-                threadId: threadId)
-            .ConfigureAwait(continueOnCapturedContext: false);
-
-        Console.WriteLine(value: $"Completed block @{completedBlock.StartingOffset}");
     }
 
     public void Dispose()
     {
-        foreach (var thread in _threads!)
+        _tokenSource.Cancel();
+        foreach (var task in _tasks)
         {
-            thread?.Join();
+            task?.Dispose();
         }
 
         _fasterKv.Dispose();
     }
 
-    public async Task Run(int timeout = -1)
+    public async IAsyncEnumerable<WorkBlock> Run()
     {
-        var i = 0;
-        var tasks = new Task[_threads.Length];
-        foreach (var thread in _threads)
-        {
-            tasks[i++] = Task.Run(() =>
-            {
-                thread.Start();
-            });
-        }
-        Console.WriteLine(value: $"{i} threads running");
+        Console.WriteLine(value: $"Starting {MaxThreadCount} threads");
 
-        if (timeout == -1)
-            Task.WaitAll(tasks);
-        else
-            Task.WaitAll(tasks,
-                timeout: TimeSpan.FromSeconds(timeout));
+        while (!_tokenSource.IsCancellationRequested)
+        {
+            for (var threadId = 0; threadId < MaxThreadCount; threadId++)
+            {
+                if (!_running[threadId])
+                {
+                    _running[threadId] = true;
+
+                    // get the next starting offset
+                    var startingOffset = _piBytesOffset;
+                    Console.WriteLine(value: $"Started thread at offset {startingOffset}");
+
+                    var newWorkBlock = new WorkBlock(
+                        startingOffset: startingOffset,
+                        blockSizes: _blockSizes);
+
+                    // bump the offset by the size of the native ('resolution') block
+                    _piBytesOffset += BBPCalculator.NativeChunkSizeInChars;
+
+                    // create a new task
+                    var newTask = NewComputationTask(
+                        workBlock: newWorkBlock,
+                        threadId: threadId,
+                        cancellationToken: _tokenSource.Token);
+
+                    _workBlocks[threadId] = newWorkBlock;
+                    _tasks[threadId] = newTask;
+
+                    await newTask.ConfigureAwait(continueOnCapturedContext: false);
+                }
+            }
+
+            var completedThreadId = Task.WaitAny(tasks: _tasks);
+
+            var task = _tasks[completedThreadId];
+            // if task is not done, continue
+            if (task.Status is not (TaskStatus.Canceled or TaskStatus.Faulted or TaskStatus.RanToCompletion))
+            {
+                continue;
+            }
+
+            if (task.IsCompletedSuccessfully)
+            {
+                var completedWorkBlock = _workBlocks[completedThreadId]!;
+                yield return completedWorkBlock;
+
+                await Console.Out.WriteLineAsync(value: $"+ SUCCESS: @{completedWorkBlock.StartingOffset}")
+                    .ConfigureAwait(continueOnCapturedContext: false);
+                foreach (var (blockLength, dataHash) in completedWorkBlock.BlockSizeHashes)
+                {
+                    await Console.Out.WriteLineAsync(value: $"  > {blockLength} byte block with hash {dataHash.ToString()}")
+                        .ConfigureAwait(continueOnCapturedContext: false);
+                }
+            }
+            else
+            {
+                // TODO: actually retry
+                _failedOffsetsToRetry.Add(item: _workBlocks[completedThreadId]!.StartingOffset);
+                await Console.Error.WriteLineAsync(value: "- FAILED: " + task.Exception!.Message)
+                    .ConfigureAwait(continueOnCapturedContext: false);
+            }
+
+            task.Dispose();
+            _running[completedThreadId] = false;
+            _workBlocks[completedThreadId] = null;
+        } // end while
     }
 
-
-    private async Task<WorkBlock> WorkAndLogComputation(long startingOffset, int threadId)
+    private async Task NewComputationTask(WorkBlock workBlock, int threadId, CancellationToken cancellationToken)
     {
-        var workBlock = new WorkBlock(
-            startingOffset: startingOffset,
-            blockSizes: _blockSizes);
+        // ReSharper disable InlineTemporaryVariable
+        var threadIdCopy = threadId;
+        // ReSharper restore InlineTemporaryVariable
 
         await workBlock
-            .Work(workingMemory: _piBytes[threadId])
+            .Work(
+                workingMemory: _piBytes[threadIdCopy],
+                cancellationToken: cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
 
         foreach (var blockSize in workBlock.BlockSizes)
@@ -91,9 +134,7 @@ public class Tracker : IDisposable
                 n: workBlock.StartingOffset,
                 blockSize: blockSize,
                 firstByte: workBlock.FirstByte!.Value,
-                sha256: Convert.ToHexString(inArray: workBlock.BlockSizesHashes[key: blockSize].HashBytes.ToArray()));
+                sha256: Convert.ToHexString(inArray: workBlock.BlockSizeHashes[key: blockSize].HashBytes.ToArray()));
         }
-
-        return workBlock;
     }
 }

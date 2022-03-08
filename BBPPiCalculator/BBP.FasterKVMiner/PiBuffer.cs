@@ -82,7 +82,7 @@ public class PiBuffer
     /// <summary>
     ///     Current offset being evaluated.
     /// </summary>
-    public long Offset { get; private set; }
+    public long Offset { get; }
 
     private long BytesUsed => _piBlocks.Count() * BBPCalculator.NativeChunkSizeInChars;
 
@@ -114,7 +114,7 @@ public class PiBuffer
         return freed;
     }
 
-    public async Task<PiBlock> GetPiBlock(long nOffset, CancellationToken cancellationToken)
+    public async Task<PiBlock> GetFixedOffsetPiBlockAsync(long nOffset, CancellationToken cancellationToken)
     {
         _piBlocksMutex.WaitOne();
         try
@@ -160,9 +160,9 @@ public class PiBuffer
         }
     }
 
-    public async Task<byte> GetPiByte(long nOffset, CancellationToken cancellationToken)
+    public async Task<byte> GetPiByteAsync(long nOffset, CancellationToken cancellationToken)
     {
-        var piBytes = await GetPiBlock(
+        var piBytes = await GetFixedOffsetPiBlockAsync(
                 nOffset: nOffset,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
@@ -171,24 +171,14 @@ public class PiBuffer
     }
 
     /// <summary>
-    ///     Execute a work unit.
+    ///     Find the sub-sequences of a pi block.
     /// </summary>
     /// <returns></returns>
     /// <exception cref="Exception"></exception>
-    public async IAsyncEnumerable<PiBlock> Work()
+    public IEnumerable<PiBlock> EnumerateSubBlocks(PiBlock fixedIntervalPiBlock)
     {
-        using var tokenSource = new CancellationTokenSource();
-        var cancellationToken = tokenSource.Token;
-        var offset = Offset++;
-        var task = new Task<byte[]>(function: () => BBPCalculator.PiBytes(
-            n: offset,
-            count: BlockLengths.Max()).ToArray());
-
-        var piBytes = await task
-            .WaitAsync(cancellationToken: cancellationToken)
-            .ConfigureAwait(continueOnCapturedContext: false);
-
-        foreach (var piByte in piBytes)
+        var offset = fixedIntervalPiBlock.N;
+        foreach (var piByte in fixedIntervalPiBlock.Values.ToArray())
         {
             foreach (var blockLength in BlockLengths)
             {
@@ -228,6 +218,8 @@ public class PiBuffer
                     Values: readonlyAggregate,
                     DataHash: new DataHash(dataBytes: readonlyAggregate));
             }
+
+            offset++;
         }
     }
 }

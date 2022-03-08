@@ -18,15 +18,22 @@ public class WorkBlock : IWorkable
         _blockSizeHashBuffer = new Dictionary<int, DataHash>();
     }
 
-    public ImmutableDictionary<int, DataHash> BlockSizesHashes
+    public ImmutableDictionary<int, DataHash> BlockSizeHashes
         => Completed ? _blockSizeHashBuffer.ToImmutableDictionary() : throw new Exception(message: "result not complete");
 
     public bool Completed { get; private set; }
 
-    public async Task Work(PiBuffer workingMemory)
+    public async Task Work(PiBuffer workingMemory, CancellationToken cancellationToken)
     {
         using var sha256 = SHA256.Create();
-        await foreach (var (nOffset, blockEnumerable, blockHash) in workingMemory.Work())
+
+        var fixedIntervalPiBlock = await workingMemory.GetFixedOffsetPiBlockAsync(
+                nOffset: StartingOffset,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(continueOnCapturedContext: false);
+
+        foreach (var (nOffset, blockEnumerable, blockHash) in workingMemory
+                     .EnumerateSubBlocks(fixedIntervalPiBlock: fixedIntervalPiBlock))
         {
             var blockArray = blockEnumerable.ToArray();
             var blockSize = blockArray.Length;
