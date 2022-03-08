@@ -39,6 +39,7 @@ public class PiDigitTest
     [DataRow(data1: 0, 40, "243F6A8885A308D313198A2E03707344A4093822")]
     [DataRow(data1: 1, 38, "43F6A8885A308D313198A2E03707344A409382")]
     [DataRow(data1: 10, 30, "A308D313198A2E03707344A4093822")]
+    [DataRow(data1: 1000000,  23, "6C65E52CB459350050E4BB1")]
     public void TestPiChars(long n, int count, string expected)
     {
         var result = new string(value: BBPCalculator
