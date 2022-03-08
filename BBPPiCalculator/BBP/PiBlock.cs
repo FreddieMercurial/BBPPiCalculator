@@ -1,3 +1,6 @@
-﻿namespace BBP;
+﻿using NeuralFabric.Models.Hashes;
 
-public record PiBlock(long N, IEnumerable<byte> Values);
+namespace BBP;
+
+[Serializable]
+public record PiBlock(long N, ReadOnlyMemory<byte> Values, DataHash DataHash);

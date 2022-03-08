@@ -6,4 +6,7 @@
     <Nullable>enable</Nullable>
     <AnalysisLevel>preview</AnalysisLevel>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\NeuralFabric\NeuralFabric.csproj"/>
+  </ItemGroup>
 </Project>

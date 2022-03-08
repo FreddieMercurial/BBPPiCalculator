@@ -1,33 +1,21 @@
 ﻿using System.Collections.Immutable;
+using NeuralFabric.Models.Hashes;
 
 namespace BBP.FasterKVMiner;
 
 public class PiBuffer
 {
-    /// <summary>
-    ///     Block lengths being evaluated.
-    /// </summary>
-    private readonly int[] _blockLengths;
+    private const long MaximumMemory = 1024 * 1024 * 1024; // 1GB
+
+    private static readonly Dictionary<long, PiBlock> _piBlocks = new();
+    private static readonly Mutex _piBlocksMutex = new();
+    private static long _lowestPiBlock = -1;
+    private static long _highestPiBlock = -1;
 
     /// <summary>
     ///     Queues of piBytes sorted by the number of bytes in each block size
     /// </summary>
-    private readonly ImmutableDictionary<int, Queue<PiByte>> _digitQuesByBlockLength;
-
-    /// <summary>
-    ///     First offset evaluated.
-    /// </summary>
-    private readonly long _firstOffset;
-
-    /// <summary>
-    ///     Last offset to be evaluated.
-    /// </summary>
-    private readonly long _lastOffset;
-
-    /// <summary>
-    ///     Current offset being evaluated.
-    /// </summary>
-    private long _offset;
+    private readonly ImmutableDictionary<int, Queue<PiByte>> _workingQueuesByBlockLength;
 
     /// <summary>
     /// </summary>
@@ -58,25 +46,129 @@ public class PiBuffer
         var digitQueues = new Dictionary<int, Queue<PiByte>>();
         foreach (var blockLength in blockLengths)
         {
-            digitQueues[key: blockLength] = new Queue<PiByte>();
+            if (blockLength < BBPCalculator.NativeChunkSizeInChars)
+            {
+                throw new ArgumentException(
+                    message: $"{blockLength} is less than the native chunk size of {BBPCalculator.NativeChunkSizeInChars}",
+                    paramName: nameof(blockLengths));
+            }
+
+            digitQueues.Add(key: blockLength,
+                value: new Queue<PiByte>());
         }
 
-        _firstOffset = offset;
-        _lastOffset = _offset + longestBlock;
-        _offset = offset;
-        _blockLengths = blockLengths;
-        _digitQuesByBlockLength = digitQueues.ToImmutableDictionary();
+        BlockLengths = blockLengths;
+        _workingQueuesByBlockLength = digitQueues.ToImmutableDictionary();
+        FirstOffset = offset;
+        LastOffset = Offset + longestBlock;
+        Offset = offset;
     }
 
     /// <summary>
-    ///     First offset evaluated
+    ///     Block lengths being evaluated.
     /// </summary>
-    public long FirstOffset => _firstOffset;
+    public int[] BlockLengths { get; init; }
 
     /// <summary>
-    ///     Last offset to be evaluated
+    ///     First offset evaluated.
     /// </summary>
-    public long LastOffset => _lastOffset;
+    public long FirstOffset { get; init; }
+
+    /// <summary>
+    ///     Highest offset evaluated.
+    /// </summary>
+    public long LastOffset { get; init; }
+
+    /// <summary>
+    ///     Current offset being evaluated.
+    /// </summary>
+    public long Offset { get; private set; }
+
+    private long BytesUsed => _piBlocks.Count() * BBPCalculator.NativeChunkSizeInChars;
+
+    public long ClosestOffset(long nOffset)
+    {
+        return (long)(Math.Floor(d: (double)nOffset / BBPCalculator.NativeChunkSizeInChars) * BBPCalculator.NativeChunkSizeInChars);
+    }
+
+    public long GarbageCollect()
+    {
+        if (BytesUsed <= MaximumMemory)
+        {
+            return 0;
+        }
+
+        var freed = 0;
+        while (BytesUsed > MaximumMemory)
+        {
+            var lowestKey = _piBlocks.Keys.Min();
+            _piBlocks.Remove(key: lowestKey);
+            freed += BBPCalculator.NativeChunkSizeInChars;
+        }
+
+        // update lowest key
+        _lowestPiBlock = _piBlocks.Keys.Min();
+
+        Console.WriteLine(value: $"PiBytes GC Freed {freed} bytes");
+
+        return freed;
+    }
+
+    public async Task<PiBlock> GetPiBlock(long nOffset, CancellationToken cancellationToken)
+    {
+        _piBlocksMutex.WaitOne();
+        try
+        {
+            var closestOffset = ClosestOffset(nOffset: nOffset);
+            if (_piBlocks.ContainsKey(key: closestOffset))
+            {
+                return _piBlocks[key: closestOffset];
+            }
+
+            var task = new Task<byte[]>(function: () => BBPCalculator.PiBytes(
+                n: closestOffset,
+                count: BBPCalculator.NativeChunkSizeInChars).ToArray());
+
+            var piBytes = await task
+                .WaitAsync(cancellationToken: cancellationToken)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+            if (_lowestPiBlock == -1 || nOffset < _lowestPiBlock)
+            {
+                _lowestPiBlock = nOffset;
+            }
+
+            if (_highestPiBlock == -1 || nOffset > _highestPiBlock)
+            {
+                _highestPiBlock = nOffset;
+            }
+
+            var readonlyBytes = new ReadOnlyMemory<byte>(array: piBytes);
+            var block = new PiBlock(
+                N: closestOffset,
+                Values: readonlyBytes,
+                DataHash: new DataHash(dataBytes: readonlyBytes));
+
+            _piBlocks[key: closestOffset] = block;
+            GarbageCollect();
+
+            return block;
+        }
+        finally
+        {
+            _piBlocksMutex.ReleaseMutex();
+        }
+    }
+
+    public async Task<byte> GetPiByte(long nOffset, CancellationToken cancellationToken)
+    {
+        var piBytes = await GetPiBlock(
+                nOffset: nOffset,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(continueOnCapturedContext: false);
+        var offsetRemainder = (int)(nOffset % BBPCalculator.NativeChunkSizeInChars);
+        return piBytes.Values.ToArray()[offsetRemainder];
+    }
 
     /// <summary>
     ///     Execute a work unit.
@@ -87,10 +179,10 @@ public class PiBuffer
     {
         using var tokenSource = new CancellationTokenSource();
         var cancellationToken = tokenSource.Token;
-        var offset = _offset++;
+        var offset = Offset++;
         var task = new Task<byte[]>(function: () => BBPCalculator.PiBytes(
             n: offset,
-            count: _blockLengths.Max()).ToArray());
+            count: BlockLengths.Max()).ToArray());
 
         var piBytes = await task
             .WaitAsync(cancellationToken: cancellationToken)
@@ -98,20 +190,25 @@ public class PiBuffer
 
         foreach (var piByte in piBytes)
         {
-            foreach (var blockLength in _blockLengths)
+            foreach (var blockLength in BlockLengths)
             {
-                _digitQuesByBlockLength[key: blockLength].Enqueue(
+                _workingQueuesByBlockLength[key: blockLength].Enqueue(
                     item: new PiByte(
                         N: offset,
                         Value: piByte));
 
-                if (_digitQuesByBlockLength.Count <= blockLength)
+                if (_workingQueuesByBlockLength.Count <= blockLength)
                 {
                     continue;
                 }
 
-                _digitQuesByBlockLength[key: blockLength].Dequeue();
-                var piBytesForLength = _digitQuesByBlockLength[key: blockLength].ToArray();
+                if (blockLength == 1)
+                {
+                    continue;
+                }
+
+                _workingQueuesByBlockLength[key: blockLength].Dequeue();
+                var piBytesForLength = _workingQueuesByBlockLength[key: blockLength].ToArray();
                 if (piBytesForLength.Any(predicate: p => p.N != offset))
                 {
                     throw new Exception(message: "PiBuffer: n _offset mismatch");
@@ -125,9 +222,11 @@ public class PiBuffer
 
                 Console.WriteLine(value: $"Completed {blockLength} block at offset {offset}");
 
+                var readonlyAggregate = new ReadOnlyMemory<byte>(array: aggregate);
                 yield return new PiBlock(
                     N: offset,
-                    Values: aggregate);
+                    Values: readonlyAggregate,
+                    DataHash: new DataHash(dataBytes: readonlyAggregate));
             }
         }
     }

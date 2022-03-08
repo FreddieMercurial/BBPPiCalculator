@@ -57,7 +57,7 @@ public class PiDigitTest
     [DataRow(data1: 10, 30, "A308D313198A2E03707344A4093822")]
     public async Task TestPiCharsAsync(long n, int count, string expected)
     {
-        var accumulator = new List<char>();
+        var accumulator = new List<char>(capacity: count);
         await foreach (var c in BBPCalculator
                            .PiCharsAsync(
                                n: n,
@@ -102,7 +102,7 @@ public class PiDigitTest
     [DataRow(data1: 10, 15, new byte[] {0xA3, 0x08, 0xD3, 0x13, 0x19, 0x8A, 0x2E, 0x03, 0x70, 0x73, 0x44, 0xA4, 0x09, 0x38, 0x22})]
     public async Task TestPiBytesAsync(long n, int count, byte[] expected)
     {
-        var accumulator = new List<byte>();
+        var accumulator = new List<byte>(capacity: count);
         await foreach (var b in BBPCalculator
                            .PiBytesAsync(
                                n: n,
@@ -145,7 +145,7 @@ public class PiDigitTest
 
         // 31st digit + 9
         nOffset = 31;
-        var accumulator = new List<char>();
+        var accumulator = new List<char>(capacity: 10);
         await foreach (var c in BBPCalculator
                            .PiCharsAsync(
                                n: nOffset++,

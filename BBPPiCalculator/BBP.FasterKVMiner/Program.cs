@@ -13,7 +13,7 @@ internal class Program
         var app = new CommandApp<DefaultCommand>();
         app.Configure(configuration: config =>
         {
-            config.SetApplicationName(name: "dotnet example");
+            config.SetApplicationName(name: "Bailey-Borwein-Plouffe Pi Miner");
         });
 
         return await app
@@ -22,26 +22,31 @@ internal class Program
     }
 }
 
-public sealed class DefaultCommand : AsyncCommand<DefaultCommand.Settings>
+public sealed class DefaultCommand : AsyncCommand<DefaultCommand.Settings>, IDisposable
 {
     private readonly IAnsiConsole _console;
     private readonly IEnvironment _environment;
     private readonly IFileSystem _fileSystem;
-    private readonly IGlobber _globber;
+    private readonly Tracker _tracker;
 
     public DefaultCommand(IAnsiConsole console)
     {
         _console = console;
         _fileSystem = new FileSystem();
         _environment = new Environment();
-        _globber = new Globber(fileSystem: _fileSystem,
-            environment: _environment);
+
+        _tracker = new Tracker(baseDirectory: System.Environment.CurrentDirectory);
+    }
+
+    public void Dispose()
+    {
+        _tracker.Dispose();
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
         _console.Clear();
-        _console.WriteLine(text: "Hello world");
+        await _tracker.Run().ConfigureAwait(false);
         return 0;
     }
 
