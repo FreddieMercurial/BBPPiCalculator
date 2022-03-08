@@ -21,18 +21,4 @@ public class WorkBlockTests
             startingOffset: 0,
             blockSizes: new[] {10, 20, 21, 40});
     }
-
-    [TestMethod]
-    public void AsWorkable_StateUnderTest_ExpectedBehavior()
-    {
-        // Arrange
-        var workBlock = CreateWorkBlock();
-
-        // Act
-        var result = workBlock.AsWorkable();
-
-        // Assert
-        Assert.Fail();
-        mockRepository.VerifyAll();
-    }
 }

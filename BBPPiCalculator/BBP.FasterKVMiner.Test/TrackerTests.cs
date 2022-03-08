@@ -1,4 +1,5 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using System;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
 namespace BBP.FasterKVMiner.Test;
@@ -17,7 +18,7 @@ public class TrackerTests
 
     private Tracker CreateTracker()
     {
-        return new Tracker();
+        return new Tracker(baseDirectory: Environment.CurrentDirectory);
     }
 
     [TestMethod]

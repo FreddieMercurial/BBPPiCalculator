@@ -28,7 +28,7 @@ public class WorkBlock : IWorkable
         using var sha256 = SHA256.Create();
 
         var fixedIntervalPiBlock = await workingMemory.GetFixedOffsetPiBlockAsync(
-                nOffset: StartingOffset,
+                offsetInHexDigits: StartingOffset,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
 

@@ -9,11 +9,11 @@ public class Tracker : IDisposable
     private readonly FasterKVBBPiMiner _fasterKv;
 
     private readonly PiBuffer[] _piBytes;
-    private readonly CancellationTokenSource _tokenSource;
-    private long _piBytesOffset;
     private readonly bool[] _running;
     private readonly Task[] _tasks;
+    private readonly CancellationTokenSource _tokenSource;
     private readonly WorkBlock?[] _workBlocks;
+    private long _piBytesOffset;
 
     public Tracker(string baseDirectory)
     {
@@ -28,7 +28,7 @@ public class Tracker : IDisposable
         for (var threadId = 0; threadId < MaxThreadCount; threadId++)
         {
             _piBytes[threadId] = new PiBuffer(
-                offset: _piBytesOffset,
+                offsetInHexDigits: _piBytesOffset,
                 blockLengths: _blockSizes);
         }
     }
@@ -65,7 +65,7 @@ public class Tracker : IDisposable
                         blockSizes: _blockSizes);
 
                     // bump the offset by the size of the native ('resolution') block
-                    _piBytesOffset += BBPCalculator.NativeChunkSizeInChars;
+                    _piBytesOffset += BBPCalculator.NativeChunkSizeInBytes;
 
                     // create a new task
                     var newTask = NewComputationTask(

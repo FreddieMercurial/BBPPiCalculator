@@ -18,7 +18,7 @@ public class FasterKVBBPiMinerTests
 
     private FasterKVBBPiMiner CreateFasterKVBBPiMiner()
     {
-        return new FasterKVBBPiMiner();
+        return new FasterKVBBPiMiner(baseDirectory: Environment.CurrentDirectory);
     }
 
     [TestMethod]
@@ -28,14 +28,14 @@ public class FasterKVBBPiMinerTests
         var fasterKVBBPiMiner = CreateFasterKVBBPiMiner();
         long n = 0;
         var blockSize = 0;
-        var firstChar = default(Char);
-        string sha256 = null;
+        byte firstByte = 0;
+        var sha256 = string.Empty;
 
         // Act
         fasterKVBBPiMiner.AddComputation(
             n: n,
             blockSize: blockSize,
-            firstChar: firstChar,
+            firstByte: firstByte,
             sha256: sha256);
 
         // Assert
