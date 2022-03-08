@@ -83,7 +83,7 @@ public class Program
             Parallel.For(digitStart, digitEnd / 10, i =>
 #endif
         {
-            var result = BBPCalculator.Calculate(n: i *
+            var result = BBPCalculator.Calculate(offsetInHexDigitChars: i *
                                                     10); // store the result so we can sort it later (eventually consistent)                              
             PiDigits.Add(item: result); // the list is used in case we are using parallelization which will process slices out of order                                                                                                                       
 #if !PARALLELIZE

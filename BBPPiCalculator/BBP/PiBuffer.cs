@@ -1,14 +1,13 @@
 ﻿using System.Collections.Immutable;
 using NeuralFabric.Models.Hashes;
 
-namespace BBP.FasterKVMiner;
+namespace BBP;
 
 public class PiBuffer
 {
     private const long MaximumMemory = 1024 * 1024 * 1024; // 1GB
 
     private static readonly Dictionary<long, PiBlock> _piBlocks = new();
-    private static readonly Mutex _piBlocksMutex = new();
     private static long _lowestPiBlock = -1;
     private static long _highestPiBlock = -1;
 
@@ -19,16 +18,16 @@ public class PiBuffer
 
     /// <summary>
     /// </summary>
-    /// <param name="offset"></param>
+    /// <param name="offsetInHexDigits"></param>
     /// <param name="blockLengths"></param>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="ArgumentNullException"></exception>
-    public PiBuffer(long offset, int[] blockLengths)
+    public PiBuffer(long offsetInHexDigits, int[] blockLengths)
     {
-        if (offset < 0)
+        if (offsetInHexDigits < 0)
         {
             throw new ArgumentException(message: null,
-                paramName: nameof(offset));
+                paramName: nameof(offsetInHexDigits));
         }
 
         if (!blockLengths.Any())
@@ -37,7 +36,7 @@ public class PiBuffer
         }
 
         var longestBlock = blockLengths.Max();
-        if (longestBlock < BBPCalculator.NativeChunkSizeInChars)
+        if (longestBlock < BBPCalculator.NativeChunkSizeInBytes)
         {
             throw new ArgumentException(message: null,
                 paramName: nameof(blockLengths));
@@ -46,10 +45,10 @@ public class PiBuffer
         var digitQueues = new Dictionary<int, Queue<PiByte>>();
         foreach (var blockLength in blockLengths)
         {
-            if (blockLength < BBPCalculator.NativeChunkSizeInChars)
+            if (blockLength < BBPCalculator.NativeChunkSizeInBytes)
             {
                 throw new ArgumentException(
-                    message: $"{blockLength} is less than the native chunk size of {BBPCalculator.NativeChunkSizeInChars}",
+                    message: $"{blockLength} is less than the native chunk size of {BBPCalculator.NativeChunkSizeInBytes}",
                     paramName: nameof(blockLengths));
             }
 
@@ -59,9 +58,9 @@ public class PiBuffer
 
         BlockLengths = blockLengths;
         _workingQueuesByBlockLength = digitQueues.ToImmutableDictionary();
-        FirstOffset = offset;
-        LastOffset = Offset + longestBlock;
-        Offset = offset;
+        FirstOffsetInHexDigits = offsetInHexDigits;
+        LastOffsetInHexDigits = OffsetInHexDigits + longestBlock;
+        OffsetInHexDigits = offsetInHexDigits;
     }
 
     /// <summary>
@@ -72,23 +71,29 @@ public class PiBuffer
     /// <summary>
     ///     First offset evaluated.
     /// </summary>
-    public long FirstOffset { get; init; }
+    public long FirstOffsetInHexDigits { get; init; }
 
     /// <summary>
     ///     Highest offset evaluated.
     /// </summary>
-    public long LastOffset { get; init; }
+    public long LastOffsetInHexDigits { get; init; }
 
     /// <summary>
     ///     Current offset being evaluated.
     /// </summary>
-    public long Offset { get; }
+    public long OffsetInHexDigits { get; }
 
-    private long BytesUsed => _piBlocks.Count() * BBPCalculator.NativeChunkSizeInChars;
+    private long BytesUsed => _piBlocks.Count() * BBPCalculator.NativeChunkSizeInBytes;
 
-    public long ClosestOffset(long nOffset)
+    public long ClosestOffsetInHexDigitChars(long nOffset)
     {
-        return (long)(Math.Floor(d: (double)nOffset / BBPCalculator.NativeChunkSizeInChars) * BBPCalculator.NativeChunkSizeInChars);
+        return (long)(Math.Floor(d: (double)nOffset / BBPCalculator.NativeChunkSizeInHexDigitChars) *
+                      BBPCalculator.NativeChunkSizeInHexDigitChars);
+    }
+
+    public int OffsetRemainderInHexDigitChars(long nOffset)
+    {
+        return (int)(nOffset % BBPCalculator.NativeChunkSizeInHexDigitChars);
     }
 
     public long GarbageCollect()
@@ -103,7 +108,7 @@ public class PiBuffer
         {
             var lowestKey = _piBlocks.Keys.Min();
             _piBlocks.Remove(key: lowestKey);
-            freed += BBPCalculator.NativeChunkSizeInChars;
+            freed += BBPCalculator.NativeChunkSizeInBytes;
         }
 
         // update lowest key
@@ -114,60 +119,89 @@ public class PiBuffer
         return freed;
     }
 
-    public async Task<PiBlock> GetFixedOffsetPiBlockAsync(long nOffset, CancellationToken cancellationToken)
+    public async Task<PiBlock> GetFixedOffsetPiBlockAsync(long offsetInHexDigits, CancellationToken cancellationToken)
     {
-        _piBlocksMutex.WaitOne();
-        try
+        var closestOffset = ClosestOffsetInHexDigitChars(nOffset: offsetInHexDigits);
+        if (_piBlocks.ContainsKey(key: closestOffset))
         {
-            var closestOffset = ClosestOffset(nOffset: nOffset);
-            if (_piBlocks.ContainsKey(key: closestOffset))
-            {
-                return _piBlocks[key: closestOffset];
-            }
-
-            var task = new Task<byte[]>(function: () => BBPCalculator.PiBytes(
-                n: closestOffset,
-                count: BBPCalculator.NativeChunkSizeInChars).ToArray());
-
-            var piBytes = await task
-                .WaitAsync(cancellationToken: cancellationToken)
-                .ConfigureAwait(continueOnCapturedContext: false);
-
-            if (_lowestPiBlock == -1 || nOffset < _lowestPiBlock)
-            {
-                _lowestPiBlock = nOffset;
-            }
-
-            if (_highestPiBlock == -1 || nOffset > _highestPiBlock)
-            {
-                _highestPiBlock = nOffset;
-            }
-
-            var readonlyBytes = new ReadOnlyMemory<byte>(array: piBytes);
-            var block = new PiBlock(
-                N: closestOffset,
-                Values: readonlyBytes,
-                DataHash: new DataHash(dataBytes: readonlyBytes));
-
-            _piBlocks[key: closestOffset] = block;
-            GarbageCollect();
-
-            return block;
+            return _piBlocks[key: closestOffset];
         }
-        finally
+
+        var piBytes = new List<byte>();
+        await foreach (var piByte in BBPCalculator.PiBytesAsync(
+                               offsetInHexDigitChars: closestOffset,
+                               byteCount: BBPCalculator.NativeChunkSizeInBytes)
+                           .WithCancellation(cancellationToken: cancellationToken)
+                           .ConfigureAwait(continueOnCapturedContext: false))
         {
-            _piBlocksMutex.ReleaseMutex();
+            piBytes.Add(item: piByte);
         }
+
+        if (_lowestPiBlock == -1 || offsetInHexDigits < _lowestPiBlock)
+        {
+            _lowestPiBlock = offsetInHexDigits;
+        }
+
+        if (_highestPiBlock == -1 || offsetInHexDigits > _highestPiBlock)
+        {
+            _highestPiBlock = offsetInHexDigits;
+        }
+
+        var readonlyBytes = new ReadOnlyMemory<byte>(array: piBytes.ToArray());
+        var block = new PiBlock(
+            N: closestOffset,
+            Values: readonlyBytes,
+            DataHash: new DataHash(dataBytes: readonlyBytes));
+
+        _piBlocks[key: closestOffset] = block;
+        GarbageCollect();
+
+        return block;
     }
 
-    public async Task<byte> GetPiByteAsync(long nOffset, CancellationToken cancellationToken)
+    public async Task<byte> GetPiByteAsync(long offsetInHexDigits, CancellationToken cancellationToken)
     {
         var piBytes = await GetFixedOffsetPiBlockAsync(
-                nOffset: nOffset,
+                offsetInHexDigits: offsetInHexDigits,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(continueOnCapturedContext: false);
-        var offsetRemainder = (int)(nOffset % BBPCalculator.NativeChunkSizeInChars);
-        return piBytes.Values.ToArray()[offsetRemainder];
+        return piBytes.Values.ToArray()[OffsetRemainderInHexDigitChars(nOffset: offsetInHexDigits)];
+    }
+
+    public async Task<IEnumerable<byte>> GetPiBytesAsync(long offsetInHexDigits, int byteCount, CancellationToken cancellationToken)
+    {
+        var closestOffsetInHexDigitChars = ClosestOffsetInHexDigitChars(nOffset: offsetInHexDigits);
+        var fixedArrayOffset = OffsetRemainderInHexDigitChars(nOffset: offsetInHexDigits);
+
+        var piBytes = new List<byte>(capacity: byteCount);
+        var remainingBytes = byteCount;
+        while (remainingBytes > 0)
+        {
+            var fixedOffsetBlock = await GetFixedOffsetPiBlockAsync(
+                    offsetInHexDigits: closestOffsetInHexDigitChars,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(continueOnCapturedContext: false);
+
+            var fixedOffsetBytes = fixedOffsetBlock.Values.ToArray();
+            closestOffsetInHexDigitChars += BBPCalculator.NativeChunkSizeInHexDigitChars;
+
+            var lengthToAdd = Math.Min(
+                val1: BBPCalculator.NativeChunkSizeInBytes,
+                val2: remainingBytes);
+
+            var bytesToAdd = fixedOffsetBytes
+                .Skip(count: fixedArrayOffset)
+                .Take(count: lengthToAdd)
+                .ToArray();
+
+            piBytes.AddRange(collection: bytesToAdd);
+            remainingBytes -= bytesToAdd.Length;
+
+            // reset the array offset
+            fixedArrayOffset = 0;
+        }
+
+        return piBytes;
     }
 
     /// <summary>

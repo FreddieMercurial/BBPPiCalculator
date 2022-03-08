@@ -41,7 +41,7 @@ public static class BBPCalculator
 
         while (remaining > 0)
         {
-            var piResult = await CalculateAsync(n: n + offset)
+            var piResult = await CalculateAsync(offsetInHexDigitChars: n + offset)
                 .ConfigureAwait(continueOnCapturedContext: false);
             offset += piResult.HexDigits.Length;
             foreach (var t in piResult.HexDigits)
@@ -68,7 +68,7 @@ public static class BBPCalculator
 
         while (remaining > 0)
         {
-            var piResult = Calculate(n: n + offset);
+            var piResult = Calculate(offsetInHexDigitChars: n + offset);
             offset += piResult.HexDigits.Length;
             foreach (var t in piResult.HexDigits)
             {
@@ -81,17 +81,16 @@ public static class BBPCalculator
         }
     }
 
-    public static async IAsyncEnumerable<byte> PiBytesAsync(long n, int count)
+    public static async IAsyncEnumerable<byte> PiBytesAsync(long offsetInHexDigitChars, int byteCount)
     {
-        long offset = 0;
-        var remaining = count;
+        var remaining = byteCount;
 
         while (remaining > 0)
         {
-            var piResult = await CalculateAsync(n: n + offset)
+            var piResult = await CalculateAsync(offsetInHexDigitChars: offsetInHexDigitChars)
                 .ConfigureAwait(continueOnCapturedContext: false);
-            offset += piResult.HexDigits.Length;
-            for (var i = 0; i < piResult.HexDigits.Length; i += 2)
+            offsetInHexDigitChars += NativeChunkSizeInHexDigitChars;
+            for (var i = 0; i < NativeChunkSizeInHexDigitChars; i += 2)
             {
                 var hexSubstring = piResult.HexDigits.Substring(
                     startIndex: i,
@@ -108,15 +107,14 @@ public static class BBPCalculator
         }
     }
 
-    public static IEnumerable<byte> PiBytes(long n, int count)
+    public static IEnumerable<byte> PiBytes(long offsetInHexDigitChars, int count)
     {
-        long offset = 0;
         var remaining = count;
 
         while (remaining > 0)
         {
-            var piResult = Calculate(n: n + offset);
-            offset += piResult.HexDigits.Length;
+            var piResult = Calculate(offsetInHexDigitChars: offsetInHexDigitChars);
+            offsetInHexDigitChars += piResult.HexDigits.Length;
             for (var i = 0; i < piResult.HexDigits.Length; i += 2)
             {
                 var hexSubstring = piResult.HexDigits.Substring(
@@ -135,43 +133,43 @@ public static class BBPCalculator
     }
 
 
-    public static BBPResult Calculate(long n)
+    public static BBPResult Calculate(long offsetInHexDigitChars)
     {
-        if (n < 0)
+        if (offsetInHexDigitChars < 0)
         {
             throw new ArgumentException(message: null,
-                paramName: nameof(n));
+                paramName: nameof(offsetInHexDigitChars));
         }
 
         // calc the summations
         var s1 = Series(m: 1,
-            n: n);
+            n: offsetInHexDigitChars);
         var s2 = Series(m: 4,
-            n: n);
+            n: offsetInHexDigitChars);
         var s3 = Series(m: 5,
-            n: n);
+            n: offsetInHexDigitChars);
         var s4 = Series(m: 6,
-            n: n);
+            n: offsetInHexDigitChars);
 
         var pid = (4d * s1) - (2d * s2) - s3 - s4;
         pid = pid - (long)pid + 1d; // create the fraction
         var hexDigits = HexString(x: pid,
             numDigits: NumHexDigits);
 
-        return new BBPResult(Digit: n,
-            HexDigits: hexDigits[..NativeChunkSizeInChars]);
+        return new BBPResult(Digit: offsetInHexDigitChars,
+            HexDigits: hexDigits[..NativeChunkSizeInHexDigitChars]);
     }
 
     /// <summary>
     ///     Calculates the [n]th hexadecimal digit of Pi.
     /// </summary>
-    /// <param name="n">The digit of Pi which you wish to solve for.</param>
+    /// <param name="offsetInHexDigitChars">The digit of Pi which you wish to solve for.</param>
     /// <returns>Returns ten hexadecimal values of Pi from the offset (n).</returns>
-    public static async Task<BBPResult> CalculateAsync(long n)
+    public static async Task<BBPResult> CalculateAsync(long offsetInHexDigitChars)
     {
         return await Task
             // ReSharper disable once HeapView.DelegateAllocation
-            .Run(function: () => Calculate(n: n))
+            .Run(function: () => Calculate(offsetInHexDigitChars: offsetInHexDigitChars))
             .ConfigureAwait(continueOnCapturedContext: false);
     }
 
@@ -294,7 +292,8 @@ public static class BBPCalculator
     #region Vars
 
     public const int NumHexDigits = 16;
-    public const int NativeChunkSizeInChars = 10; // out of 16
+    public const int NativeChunkSizeInHexDigitChars = 10; // out of 16
+    public const int NativeChunkSizeInBytes = 5;
     private const double Epsilon = 1e-17;
 
     // ReSharper disable once HeapView.ObjectAllocation.Evident
