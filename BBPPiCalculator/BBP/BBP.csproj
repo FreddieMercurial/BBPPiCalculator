@@ -7,6 +7,6 @@
     <AnalysisLevel>preview</AnalysisLevel>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\NeuralFabric\NeuralFabric.csproj"/>
+    <ProjectReference Include="..\..\..\NeuralFabric\NeuralFabric.csproj" />
   </ItemGroup>
 </Project>
